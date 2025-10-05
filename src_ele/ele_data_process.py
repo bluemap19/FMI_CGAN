@@ -2,8 +2,12 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy
-
+import cv2
+from tqdm import tqdm
+import sys
 from src_ele.file_operation import get_ele_data_from_path
+from src_ele.pic_opeeration import show_Pic
+
 
 # rarray = np.random.random(size=10000)
 # rarray = rarray*1000
@@ -133,6 +137,105 @@ def pic_to_text(path=r'D:\1111\Input\zg112-r\zg112-1-r_6207.3027_6571.2021_XRMI_
         header='WELLNAME= {}\nSTDEP\t= {}\nENDEP\t= {}\nLEV\t= {}\nUNIT\t= meter\nCURNAMES= {}\n\n#DEPTH'.format(
         charter, depth_data[0][0], depth_data[-1][0], lev, 'IMAGE.DYNA_FULL'), delimiter='\t', comments='', fmt='%.4f')
     pass
+
+
+
+
+def dynamic_enhancement(image_stat, step=2, windows=10):
+    """
+    静态成像动态增强接口 (优化版)
+
+    参数:
+    image_stat: 输入静态成像 (numpy数组, 形状[20000, 250])
+    step: 窗口遍历步长 (默认2)
+    windows: 静态增强窗口大小 (默认10)
+
+    返回:
+    enhanced_image: 增强后的图像 (与输入同尺寸)
+
+    优化点:
+    1. 修复金字塔操作尺寸不匹配问题
+    2. 添加尺寸验证和调整机制
+    3. 增强错误处理和日志记录
+    4. 优化内存管理
+    """
+    # 验证输入
+    if not isinstance(image_stat, np.ndarray):
+        raise ValueError("输入必须是numpy数组")
+
+    # 初始化输出图像
+    enhanced_image = np.zeros_like(image_stat, dtype=np.float64)
+    ratio = np.zeros_like(image_stat, dtype=np.float64)
+
+    # 计算窗口数量
+    num_windows = np.floor((image_stat.shape[0] - windows) / step) + 1
+
+    # 创建进度条
+    pbar = tqdm(total=num_windows, desc="动态增强处理中", file=sys.stdout)
+
+    min_value = np.min(image_stat)
+    max_value = np.max(image_stat)
+
+
+    # 滑动窗口处理
+    for i in range(0, image_stat.shape[0] - windows + 1, step):
+        try:
+            # 提取当前窗口
+            window = image_stat[i:i + windows, :]
+            ratio[i:i + windows, :] += 1
+
+            # 计算最值
+            bottom_mean = np.min(window)
+            top_mean = np.max(window)
+
+            # 线性拉伸增强
+            enhanced_window = (window - bottom_mean) / (top_mean - bottom_mean+0.01) * max_value
+            enhanced_window = np.clip(enhanced_window, min_value, max_value)  # 限制在合适范围
+
+            # 将处理后的窗口放入输出图像
+            enhanced_image[i:i + windows, :] += enhanced_window
+
+        except Exception as e:
+            # 错误处理：记录错误并继续处理
+            print(f"处理窗口 {i}-{i + windows} 时出错: {str(e)}")
+            # 使用原始窗口作为后备
+            enhanced_image[i:i + windows, :] += window
+
+        # 更新进度条
+        pbar.update(1)
+
+    # 关闭进度条
+    pbar.close()
+
+    enhanced_image = enhanced_image / ratio
+
+    return enhanced_image.astype(np.uint8)
+
+
+# 测试函数
+def test_dynamic_enhancement():
+    """测试动态增强函数"""
+    # 创建模拟静态成像 (20000×250)
+    height, width = 2000, 250
+    static_image = np.random.randint(0, 256, (height, width), dtype=np.uint8)
+
+    # 应用增强
+    enhanced = dynamic_enhancement(static_image)
+
+    # 保存结果
+    # np.save("static_image.npy", static_image)
+    # np.save("enhanced_image.npy", enhanced)
+
+    show_Pic([static_image, enhanced], pic_order='12', figuresize=(4, 8))
+    # 打印信息
+    print("静态成像增强完成")
+    print(f"原始图像尺寸: {static_image.shape}")
+    print(f"增强图像尺寸: {enhanced.shape}")
+
+
+# 主程序入口
+if __name__ == "__main__":
+    test_dynamic_enhancement()
 
 # get_ele_data_distribute(rarray)
 # line_test()

@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import xlwt
 import cv2
@@ -113,24 +115,29 @@ def get_ele_data_from_path(strname = r'D:\Data\target\107S\YS107_FMI_BorEID_FA.t
 
 
 def get_test_ele_data():
-    # path_test1 = r'D:\Data\target_stage1_small\guan17-11_342_3751.0025_3751.6675_dyna.png'
-    # path_test2 = r'D:\Data\target_stage1_small\guan17-11_342_3751.0025_3751.6675_stat.png'
+    # 获取当前脚本所在目录
+    script_dir = os.path.dirname(os.path.abspath(__file__))
 
-    path_test1 = r'D:\Data\target_stage1_small\LG7-11_79_5087.4775_5088.1100_dyna.png'
-    path_test2 = r'D:\Data\target_stage1_small\LG7-11_79_5087.4775_5088.1100_stat.png'
+    # 构建数据目录路径
+    data_dir = os.path.join(script_dir, "get_random_data")
 
-    # path_test1 = r'D:\Data\target_stage1_small\lg701-h1_476_5403.0020_5403.6670_dyna.png'
-    # path_test2 = r'D:\Data\target_stage1_small\lg701-h1_476_5403.0020_5403.6670_stat.png'
+    # 定义文件名
+    # dyna_file = "lg7-4_163_5183.3027_5183.9277_dyna.png"
+    # stat_file = "lg7-4_163_5183.3027_5183.9277_stat.png"
+    dyna_file = 'guan17-11_344_3752.0025_3753.2525_dyna.png'
+    stat_file = 'guan17-11_344_3752.0025_3753.2525_stat.png'
 
-    # path_test1 = r'D:\Data\pic_seg_choices\data_hole\hole_paper_show\LG701-H1_250_5324.5020_5325.1645_dyna.png'
-    # path_test2 = r'D:\Data\pic_seg_choices\data_hole\hole_paper_show\LG701-H1_250_5324.5020_5325.1645_stat.png'
+    # 构建完整路径
+    path_test1 = os.path.join(data_dir, dyna_file)
+    path_test2 = os.path.join(data_dir, stat_file)
 
-    # path_test1 = r'D:\Data\target_stage1_small\guan17-11_372_3766.0025_3766.6350_dyna.png'
-    # path_test2 = r'D:\Data\target_stage1_small\guan17-11_372_3766.0025_3766.6350_stat.png'
+    # 检查文件是否存在
+    if not os.path.exists(path_test1):
+        raise FileNotFoundError(f"文件不存在: {path_test1}")
+    if not os.path.exists(path_test2):
+        raise FileNotFoundError(f"文件不存在: {path_test2}")
 
-    # path_test1 = r'D:\Data\target_stage1_small\lg701_222_5224.5000_5225.1450_dyna.png'
-    # path_test2 = r'D:\Data\target_stage1_small\lg701_222_5224.5000_5225.1450_stat.png'
-
+    # 获取数据
     data_img_dyna, data_depth = get_ele_data_from_path(path_test1)
     data_img_stat, data_depth = get_ele_data_from_path(path_test2)
 

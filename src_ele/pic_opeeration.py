@@ -5,7 +5,7 @@ import numpy as np
 import cv2
 import os
 # from fracture_mask_split.fractures import pic_open_close_random
-from skimage.metrics import peak_signal_noise_ratio, structural_similarity
+# from skimage.metrics import peak_signal_noise_ratio, structural_similarity
 import math
 from src_ele.file_operation import get_test_ele_data
 # import seaborn as sns
@@ -74,15 +74,18 @@ def get_pic_distribute(pic=np.random.randint(1,256,(2,2)), dist_length=9, min_V=
         print('wrong pic shape:{}'.format(pic.shape))
         exit(0)
 
-    # print(pic_dist, pic)
-
-# get_pic_distribute()
 
 
-def show_Pic(pic_list, pic_order='12', pic_str=[], save_pic=False, path_save=''):
+def show_Pic(pic_list, pic_order='12', pic_str=[], path_save='', title='title', figure=(16, 9), show=True):
     from matplotlib import pyplot as plt
     os.environ["KMP_DUPLICATE_LIB_OK"] = 'TRUE'
     plt.rcParams['font.family'] = 'SimHei'
+    # """配置Matplotlib支持中文显示"""
+    # if os.name == 'nt':  # Windows
+    #     plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei']
+    # else:  # Mac/Linux
+    #     plt.rcParams['font.sans-serif'] = ['WenQuanYi Micro Hei', 'Heiti TC']
+    # plt.rcParams['axes.unicode_minus'] = False
 
     if len(pic_order) != 2:
         print('pic order error:{}'.format(pic_order))
@@ -90,19 +93,20 @@ def show_Pic(pic_list, pic_order='12', pic_str=[], save_pic=False, path_save='')
     num = int(pic_order[0]) * int(pic_order[1])
     if num != len(pic_list):
         print('pic order num is not equal to pic_list num:{},{}'.format(len(pic_list), pic_order))
+        exit(0)
 
+    while(len(pic_str) < len(pic_list)):
+        pic_str.append('pic_str'+str(len(pic_str)))
 
-    while( len(pic_str) < len(pic_list)):
-        pic_str.append('pic_str'+str(len(pic_list)-len(pic_str)))
-
-
+    # 判断图像是否经过归一化了，如果图像经过了归一化那就将图像进行复原为[0, 255]的内容
     for i in range(len(pic_list)):
-        if np.max(pic_list[i]) < 2.01:
-            pic_list[i] = 256*pic_list[i]
+        if np.max(pic_list[i]) < 4.01:
+            pic_list[i] = 255*pic_list[i]
         pic_list[i] = np.clip(pic_list[i], a_min=0, a_max=255)
 
     plt.close('all')
-    fig = plt.figure(figsize=(16, 9))
+    fig = plt.figure(figsize=figure)
+    fig.suptitle(title, font={'family': 'Arial', 'size': 18})
     for i in range(len(pic_list)):
         pic_temp = pic_list[i]
         # print(pic_temp.shape)
@@ -111,11 +115,9 @@ def show_Pic(pic_list, pic_order='12', pic_str=[], save_pic=False, path_save='')
                 pic_temp = pic_temp.transpose(1, 2, 0)
                 # print(pic_temp.shape)
 
-        order_str = int(pic_order+str(i+1))
         a = int(pic_order[0])
         b = int(pic_order[1])
         c = i + 1
-        # print(order_str)
         # 当a,b,c大于等于10时 .add_subplot(a, b, c)
         ax = fig.add_subplot(a, b, c)
         # ax = fig.add_subplot(order_str)
@@ -125,16 +127,20 @@ def show_Pic(pic_list, pic_order='12', pic_str=[], save_pic=False, path_save='')
             ax.imshow(pic_temp.astype(np.uint8))
         else:
             ax.imshow(pic_temp.astype(np.uint8), cmap='hot')
-        # ax.imshow(pic_list[i], cmap='afmhot')
-        # ax.imshow(pic_list[i], cmap='gist_heat')
-    plt.show()
+            # ax.imshow(pic_temp.astype(np.uint8), cmap='afmhot')
+            # ax.imshow(pic_temp.astype(np.uint8), cmap='gist_heat')
+            # ax.imshow(pic_temp.astype(np.uint8))
 
-    if save_pic:
-        if path_save == '':
-            plt.savefig('temp.png')
-        else:
-            plt.savefig(path_save)
-        plt.close()
+
+    plt.tight_layout()
+    if path_save == '':
+        pass
+    else:
+        plt.savefig(path_save)
+    if show:
+        plt.show()
+    plt.close()
+
 
 def WindowsDataZoomer_PicList(pic_list, ExtremeRatio=0.02, USE_EXTRE=False, Max_V=-1, Min_V=-1):
     pic_list_numpy = np.array(pic_list)

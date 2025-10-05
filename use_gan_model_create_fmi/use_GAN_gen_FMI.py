@@ -21,7 +21,8 @@ if __name__ == '__main__':
 
     # parser.add_argument("--dataset_path", type=str, default=r"D:\GitHubProj\dino\fracture_simulation\background_simulate\fracture_moni_3.png",
     # parser.add_argument("--dataset_path", type=str, default=r"D:\GitHubProj\dino\fracture_simulation\background_simulate\fracture_moni_7.png",
-    parser.add_argument("--dataset_path", type=str, default=r"D:\GitHubProj\dino\fracture_simulation\background_simulate\ZG8-2X_0_6179.0_6184.0_mask_33.png",
+    parser.add_argument("--dataset_path", type=str, default=r"C:\Users\Administrator\PycharmProjects\FMI_GAN_Create\fracture_mask_simulate\simu_4\dyna_simu.png",
+    # parser.add_argument("--dataset_path", type=str, default=r"D:\GitHubProj\dino\fracture_simulation\background_simulate\ZG8-2X_0_6179.0_6184.0_mask_33.png",
                         help="path of the dataset")
     parser.add_argument("--netG", type=str, default=r'D:\Data\pix2pix_exp\context_encoder_model_1\model_ele_gen_700.pth', help="netG path to load")
     parser.add_argument("--netD", type=str, default='', help="netD path to load")
