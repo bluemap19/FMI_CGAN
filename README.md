@@ -1,4 +1,4 @@
-# FMI_cGAN
+# FMI_CGAN
 simulate and generate Full borehole image data
 
 Run fracture_mask_simulate\fractures.py to generate simulated background
