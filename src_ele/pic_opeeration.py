@@ -7,6 +7,7 @@ import os
 # from fracture_mask_split.fractures import pic_open_close_random
 # from skimage.metrics import peak_signal_noise_ratio, structural_similarity
 import math
+from skimage.metrics import peak_signal_noise_ratio, structural_similarity
 from src_ele.file_operation import get_test_ele_data
 # import seaborn as sns
 # sns.set()
@@ -14,35 +15,46 @@ from src_ele.file_operation import get_test_ele_data
 # 图片的一些操作
 # 1.show_Pic(pic_list, pic_order='12', pic_str=[], save_pic=False, path_save='')
 # 展示图片，无返回
+
 # 2.WindowsDataZoomer(SinglePicWindows, ExtremeRatio=0.02)
 # 数据缩放，把电阻的数据域映射到图像的数据域，返回原图片数组大的图片数组[m,n] int
+
 # 3.GetPicContours(PicContours, threshold = 4000)
 # 对图片进行分割，threshold代表了目标区域需要保留的最小面积大小
 # 返回的 contours_Conform, contours_Drop, contours_All 代表了目标轮廓信息list，被丢掉的轮廓信息list，总的轮廓信息list
 # 轮廓信息包括，轮廓面积数值，轮廓描述（即是轮廓的存放），轮廓的质心[x, y]
+
 # 4.GetBinaryPic(ProcessingPic)
 # 有点问题，别用这个函数
+
 # 5.pic_enhence(input, windows_shape = 7, ratio_top = 0.33, ratio_migration = 5/6)
 # 图片的增强函数，用的是局部梯度偏移
+
 # 6.pic_enhence_random(input, windows_shape=3, ratio_top=0.2, ratio_migration=0.6, random_times=3)
 # 图片的增强函数，用的是随机局部梯度偏移
+
 # 7.pic_scale(input, windows_shape=3, center_ratio=0.5, x_size=100.0, y_size=100.0, ratio_top=0.1)
 # 图片缩放函数，用的是局部梯度增强缩放
+
 # 8.test_pic_enhance_effect()
 # 测试图片的增强效果
+
 # 9.adjust_gamma(image, gamma=1.0)
 # 图片的 伽马增强
+
 # 10.save_img_data(dep, data, path='')
 # 保存图片
+
 # 11.pic_smooth_effect_compare()
 # 图片的增强效果对比函数，对比上面的随机局部梯度偏移、伽马增强、直方图均衡增强效果
 
 
+# 图像色度反转
 def traverse_pic(img):
     img = 255-img
     return img
 
-
+# 图像二值化
 def binary_pic(pic):
     max_v = np.max(pic)
     for i in range(pic.shape[0]):
@@ -54,7 +66,7 @@ def binary_pic(pic):
 
     return pic
 
-
+# 图像hist获取
 def get_pic_distribute(pic=np.random.randint(1,256,(2,2)), dist_length=9, min_V=0, max_V=256):
     pic_mean = np.mean(pic)
     pic_s2 = np.var(pic)
@@ -68,24 +80,48 @@ def get_pic_distribute(pic=np.random.randint(1,256,(2,2)), dist_length=9, min_V=
                 pic_dist[index_t] += 1
 
         pic_dist = pic_dist/pic.size
-        # return pic_dist, np.array([pic_mean, pic_s2])
         return pic_dist
     else:
         print('wrong pic shape:{}'.format(pic.shape))
         exit(0)
 
 
-
-def show_Pic(pic_list, pic_order='12', pic_str=[], path_save='', title='title', figure=(16, 9), show=True):
+# 图像展示
+def show_Pic(pic_list, pic_order=None, pic_str=[], path_save='', title='title', figure=(16, 9), show=True):
     from matplotlib import pyplot as plt
     os.environ["KMP_DUPLICATE_LIB_OK"] = 'TRUE'
     plt.rcParams['font.family'] = 'SimHei'
-    # """配置Matplotlib支持中文显示"""
-    # if os.name == 'nt':  # Windows
-    #     plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei']
-    # else:  # Mac/Linux
-    #     plt.rcParams['font.sans-serif'] = ['WenQuanYi Micro Hei', 'Heiti TC']
-    # plt.rcParams['axes.unicode_minus'] = False
+
+    if pic_order is None:
+        num_pic = len(pic_list)
+        if num_pic == 4:
+            pic_order = '22'
+            figure = (9, 9)
+        elif num_pic == 6:
+            pic_order = '23'
+            figure = (12, 9)
+        elif num_pic == 8:
+            pic_order = '24'
+            figure = (8, 14)
+        elif num_pic == 9:
+            pic_order = '33'
+            figure = (9, 9)
+        elif num_pic == 10:
+            pic_order = '25'
+            figure = (18, 9)
+        elif num_pic == 12:
+            pic_order = '34'
+            figure = (12, 9)
+        elif num_pic == 14:
+            pic_order = '27'
+            figure = (18, 6)
+        elif num_pic == 15:
+            pic_order = '35'
+            figure = (15, 9)
+        else:
+            pic_order = f'1{pic_order}'
+            figure = (num_pic, 1)
+
 
     if len(pic_order) != 2:
         print('pic order error:{}'.format(pic_order))
@@ -141,7 +177,7 @@ def show_Pic(pic_list, pic_order='12', pic_str=[], path_save='', title='title', 
         plt.show()
     plt.close()
 
-
+# 图像缩放，输入是Pic_list=[Pic1, Pic2.............]
 def WindowsDataZoomer_PicList(pic_list, ExtremeRatio=0.02, USE_EXTRE=False, Max_V=-1, Min_V=-1):
     pic_list_numpy = np.array(pic_list)
     ExtremePointNum = int(pic_list_numpy.size * ExtremeRatio)
@@ -332,6 +368,7 @@ def pic_enhence(input, windows_shape = 7, ratio_top = 0.33, ratio_migration = 5/
 
     return data_new
 
+
 # 洗牌算法随机一个数组
 def shuffle(lis):
     for i in range(len(lis) - 1, 0, -1):
@@ -452,25 +489,7 @@ def pic_scale_normal(input, shape=(196, 196)):
     else:
         print('error shape:{}'.format(input.shape))
         exit(0)
-# def get_pixel_normal(pic_t=np.random.random((9, 17))):
-#     index_1 = -1
-#     index_2 = -1
-#     for j in range(pic_t.shape[1]):
-#         if (pic_t[0][j] < 0) :
-#             index_2 = j
-#             if index_1 == -1:
-#                 index_1 = j
-#
-#     # print(index_1, index_2)
-#     a = pic_t[:, :index_1]
-#     b = pic_t[:, index_2+1:]
-#
-#     # print(a, b)
-#
-#     if a.shape[1] > b.shape[1]:
-#         return np.mean(a)
-#     else:
-#         return np.mean(b)
+
 
 
 def test_pic_random_enhance_effect():
@@ -501,21 +520,6 @@ def test_pic_random_enhance_effect():
     # plt.show()
 
 
-# a = cv2.imread('1_2.png')
-# print(a.shape)
-# show_Pic([a , a, a, a], pic_order='22', save_pic=True, path_save='121212.png')
-
-
-
-def metrological_performance():
-    img1 = cv2.imread('messi5.jpg')
-    e1 = cv2.getTickCount()
-    for i in range(5, 49, 2):
-        img1 = cv2.medianBlur(img1, i)
-    e2 = cv2.getTickCount()
-    t = (e2 - e1) / cv2.getTickFrequency()
-    # print(t)
-
 
 def save_img_data(dep, data, path=''):
     dep = np.reshape(dep, (-1, 1))
@@ -524,6 +528,7 @@ def save_img_data(dep, data, path=''):
     np.savetxt(path, data, fmt='%.4f', delimiter='\t', comments='',
                header='WELLNAME={}\nSTDEP\t= {}\nENDEP\t= {}\nLEV\t= {:.4f}\nUNIT\t= meter\nCURNAMES= {}\n#DEPTH\t{}'.format(
                    'Temp_well', dep[0, 0], dep[-1, 0], dep[1, 0]-dep[0, 0], 'Img_data', 'Img_data'))
+
 
 # 线性变换的原理是对所有像素值乘上一个扩张因子 factor
 # 像素值大的变得越大，像素值小的变得越小，从而达到图像增强的效果，这里利用 Numpy 的数组进行操作；

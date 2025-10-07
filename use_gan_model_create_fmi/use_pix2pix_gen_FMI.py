@@ -101,11 +101,12 @@ if __name__ == '__main__':
     parser.add_argument("--channels_out", type=int, default=2, help="number of image channels")
 
     # parser.add_argument("--dataset_path", type=str, default=r"D:\PycharmProject\FMI_GAN_Create\fracture_mask_simulate\simu-result\mask_dyna_1_100_500.png",
-    parser.add_argument("--dataset_path", type=str, default=r"F:\FMI_SIMULATION\simu_cracks\9_background_mask.png",
+    # parser.add_argument("--dataset_path", type=str, default=r"F:\FMI_SIMULATION\simu_cracks\9_background_mask.png",
+    parser.add_argument("--dataset_path", type=str, default=r"F:\DeepLData\FMI_SIMULATION\simu_cracks_2\9_background_mask.png",
                         help="path of the dataset")
     parser.add_argument("--style_path", type=str, default=r'D:\DeepLData\target_stage1_small_big_mix\guan17-11_194_3677.0025_3678.2525_dyna.png',
                         help="path of the dataset")
-    parser.add_argument("--netG", type=str, default=r'D:\PycharmProject\FMI_GAN_Create\train_pix2pix_simulate\SSIM20%\model_ele_gen_2650.pth', help="netG path to load")
+    parser.add_argument("--netG", type=str, default=r'D:\GitHub\FMI_GAN_Create\train_pix2pix_simulate\SSIM80%\best_generator.pth', help="netG path to load")
     parser.add_argument("--netD", type=str, default='', help="netD path to load")
 
     parser.add_argument("--batch_size", type=int, default=32, help="size of the batches")

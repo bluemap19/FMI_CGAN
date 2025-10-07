@@ -7,7 +7,7 @@ from torch.utils.data import Dataset
 from PIL import Image
 import torchvision.transforms as transforms
 from pic_preprocess import pic_binary_random, pic_rorate_random, pic_tailor
-from src_ele.dir_operation import traverseFolder
+from src_ele.dir_operation import get_all_file_paths
 from src_ele.file_operation import get_ele_data_from_path
 from src_ele.pic_opeeration import show_Pic
 
@@ -15,7 +15,7 @@ from src_ele.pic_opeeration import show_Pic
 class ImageDataset_FMI(Dataset):
     def __init__(self, path=r'D:\Data\target_uns_class', x_l=256, y_l=256, random_crop=True, erode=True):
         super().__init__()
-        self.list_all_file = traverseFolder(path)
+        self.list_all_file = get_all_file_paths(path)
         self.length = len(self.list_all_file)//2
         self.x_l = x_l
         self.y_l = y_l

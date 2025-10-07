@@ -1,7 +1,7 @@
 import numpy as np
 from torch.utils.data import Dataset
 from pic_preprocess import pic_binary_random
-from src_ele.dir_operation import traverseFolder
+from src_ele.dir_operation import get_all_file_paths
 from src_ele.file_operation import get_ele_data_from_path
 import cv2
 from src_ele.pic_opeeration import show_Pic
@@ -10,7 +10,7 @@ from src_ele.pic_opeeration import show_Pic
 class dataloader_fmi_mask_create(Dataset):
     def __init__(self, path=r'D:\Data\target_uns_class', x_l=256, y_l=256, pic_rorate=True):
         super().__init__()
-        self.list_all_file = traverseFolder(path)
+        self.list_all_file = get_all_file_paths(path)
         self.length = len(self.list_all_file)//2
         self.x_l = x_l
         self.y_l = y_l
@@ -35,10 +35,10 @@ class dataloader_fmi_mask_create(Dataset):
         # show_Pic([pic_dyna, pic_stat], pic_order='12', pic_str=['', ''], save_pic=False, path_save='')
 
         dyna_kThreshold_shift = 1.3
-        pic_dyna_mask, pic_dyna = pic_binary_random(pic_dyna, kThreshold_shift=dyna_kThreshold_shift, pic_rorate=self.pic_rorate)
+        pic_dyna_mask, pic_dyna = pic_binary_random(pic_dyna, kThreshold_shift=dyna_kThreshold_shift)
         # stat_kThreshold_shift = np.random.randint(22, 28)
         stat_kThreshold_shift = 1.2
-        pic_stat_mask, pic_stat = pic_binary_random(pic_stat, kThreshold_shift=stat_kThreshold_shift, pic_rorate=self.pic_rorate)
+        pic_stat_mask, pic_stat = pic_binary_random(pic_stat, kThreshold_shift=stat_kThreshold_shift)
         # print('kThreshold_shift dyna and stat is:{}, {}'.format(dyna_kThreshold_shift, stat_kThreshold_shift))
 
         pic_dyna = pic_dyna.reshape((1, self.x_l, self.y_l))/256
@@ -57,22 +57,21 @@ class dataloader_fmi_mask_create(Dataset):
         # 或者return len(self.trg), src和trg长度一样
 
 
+if __name__ == '__main__':
+    a = dataloader_fmi_mask_create(path=r'D:\DeepLData\target_stage1_small_big_mix')
+    index_random = np.random.randint(0, 200)
+    print(index_random)
+    pic_all_org, pic_all_mask = a[index_random]
+    print(pic_all_mask.shape, pic_all_org.shape)
+    show_Pic([1-pic_all_org[0], 1-pic_all_org[1], 1-pic_all_mask[0], 1-pic_all_mask[1]], pic_order='22')
 
-# a = dataloader_fmi_mask_create(path=r'D:\Data\target_stage1_small_big_mix')
-# index_random = np.random.randint(0, 200)
-## index_random = 90
-# print(index_random)
-# pic_all_org, pic_all_mask = a[index_random]
-# print(pic_all_mask.shape, pic_all_org.shape)
-# show_Pic([1-pic_all_org[0], 1-pic_all_org[1], 1-pic_all_mask[0], 1-pic_all_mask[1]], pic_order='22')
 
+    for i in range(a.length):
+        temp = a[i]
+        show_Pic([temp[0][0]*256, temp[0][1]*256, temp[1][0]*256, temp[1][1]*256], pic_order='22', pic_str=[], save_pic=False, path_save='')
+    # print(a.length)
+    # print(a[0][0].shape)
 
-# for i in range(a.length):
-#     temp = a[i]
-#     show_Pic([temp[0][0]*256, temp[0][1]*256, temp[1][0]*256, temp[1][1]*256], pic_order='22', pic_str=[], save_pic=False, path_save='')
-# # print(a.length)
-# # print(a[0][0].shape)
-
-# (a.length)
-# print(a[0][0].shape)
+    (a.length)
+    print(a[0][0].shape)
 

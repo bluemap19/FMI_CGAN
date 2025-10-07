@@ -5,14 +5,13 @@ import time
 from torch.utils.data import DataLoader
 from torch.autograd import Variable
 import torch
+from src_ele.dir_operation import get_all_file_paths
 from train_pix2pix_simulate.pix2pix import GeneratorUNet
-from src_ele.dir_operation import traverseFolder
 from use_gan_model_create_fmi.dataloader_use_gan_model import ImageDataset_FMI_SIMULATE_LAYER
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-
     parser.add_argument("--img_size_x", type=int, default=256, help="size of image height")
     parser.add_argument("--img_size_y", type=int, default=256, help="size of image width")
     parser.add_argument("--channels_in", type=int, default=2, help="number of image channels")
@@ -48,7 +47,7 @@ if __name__ == '__main__':
     if cuda:
         generator = generator.cuda()
 
-    path_list = traverseFolder(opt.dataset_path)
+    path_list = get_all_file_paths(opt.dataset_path)
     # print(path_list)
     for i in range(len(path_list)):
         path_t = ''

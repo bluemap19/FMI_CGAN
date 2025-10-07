@@ -134,10 +134,12 @@ class Discriminator(nn.Module):
         return self.model(img_input)
 
 
-a = GeneratorUNet(in_channels=2)
-b = Discriminator()
-print(a)
-print()
-print(b)
-c= torch.rand((1, 2, 256, 256))
-print(a(c).shape)
+if __name__ == '__main__':
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(device)
+
+    a = GeneratorUNet(in_channels=2, out_channels=3).to(device)
+    b = Discriminator().to(device)
+    print(a, '\n', '\n', '\n', b)
+    c= torch.rand((7, 2, 256, 256)).to(device)
+    print(a(c).shape)

@@ -1,9 +1,8 @@
 import random
-
 import cv2
 import numpy as np
-from simulation_mask.cracks_simulation import cracks_simulation
-from simulation_mask.holes_simulation import holes_simulation
+from fracture_mask_simulate.cracks_simulation import cracks_simulation
+from fracture_mask_simulate.holes_simulation import holes_simulation
 from src_ele.pic_opeeration import show_Pic
 
 
@@ -47,7 +46,7 @@ if __name__ == '__main__':
         min_crack_height = 100
         max_crack_height = 400
         crack_x_shift = random.random()
-        file_path_save = r'F:\FMI_SIMULATION\simu_cracks'           # 必须全英文
+        file_path_save = r'F:\FMI_SIMULATION\simu_cracks_2'           # 必须全英文
 
         PIC_LIST = []
         while (end_index < IMG_BACKGROUND.shape[0]-min_crack_height):
@@ -66,6 +65,7 @@ if __name__ == '__main__':
             end_index += height_random
             # end_index += random.randint(0, int(0.1*IMG_BACKGROUND.shape[0]))
             end_index += random.randint(0, 20)
+
         PIC_LIST.append(IMG_BACKGROUND.copy())
         cv2.imwrite(file_path_save+'\\'+str(i)+'_crack_mask.png', IMG_BACKGROUND)
 

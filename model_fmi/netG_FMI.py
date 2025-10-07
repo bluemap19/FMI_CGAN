@@ -37,27 +37,14 @@ class FMI_Generator(nn.Module):
             nn.Tanh()
         )
 
-        # self.model = nn.Sequential(
-        #     *downsample(channels_in, 64, normalize=False),
-        #     *downsample(64, 128),
-        #     *downsample(128, 256),
-        #     *downsample(256, 512),
-        #
-        #     nn.Conv2d(512, 512, 1),
-        #
-        #     *upsample(512, 256),
-        #     *upsample(256, 128),
-        #     *upsample(128, 64),
-        #     # in_channels=3,out_channels=64,kernel_size=4,stride=2,padding=1
-        #     nn.Conv2d(64, channels_out, 3, 1, 1),
-        #     nn.Tanh()
-        # )
-
     def forward(self, x):
         return self.model(x)
 
+if __name__ == '__main__':
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-# a = FMI_Generator(channels_in=1, channels_out=2)
-# print(a)
-# b= torch.randn((2, 1, 32, 32))
-# print(a(b).shape)
+    FG = FMI_Generator(channels_in=3, channels_out=2).to(device)
+    print(FG)
+    t_r = torch.randn((12, 3, 256, 256)).to(device)
+
+    print(FG(t_r).shape)

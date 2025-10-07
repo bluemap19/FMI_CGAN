@@ -220,7 +220,7 @@ class OtsuFastMultithreshold(_OtsuPyramid):
         finalImage = np.zeros(im.shape, dtype=np.uint8)
         for i in range(k + 1):
             kSmall = bookendedThresholds[i]
-            bw = np.ones(im.shape, dtype=np.bool8)
+            bw = np.ones(im.shape, dtype=np.bool)
             if kSmall:
                 bw = (im >= kSmall)
             kLarge = bookendedThresholds[i + 1]
