@@ -86,96 +86,104 @@ def get_pic_distribute(pic=np.random.randint(1,256,(2,2)), dist_length=9, min_V=
         exit(0)
 
 
-# 图像展示
 def show_Pic(pic_list, pic_order=None, pic_str=[], path_save='', title='title', figure=(16, 9), show=True):
-    from matplotlib import pyplot as plt
+    import os
     os.environ["KMP_DUPLICATE_LIB_OK"] = 'TRUE'
+    # 设置后端为Agg避免PyCharm后端问题
+    import matplotlib
+    print(matplotlib.matplotlib_fname())
+    matplotlib.use('Qt5Agg')  # 使用非交互式后端
+    from matplotlib import pyplot as plt
+
     plt.rcParams['font.family'] = 'SimHei'
 
     if pic_order is None:
         num_pic = len(pic_list)
-        if num_pic == 4:
-            pic_order = '22'
-            figure = (9, 9)
-        elif num_pic == 6:
-            pic_order = '23'
-            figure = (12, 9)
-        elif num_pic == 8:
-            pic_order = '24'
-            figure = (8, 14)
-        elif num_pic == 9:
-            pic_order = '33'
-            figure = (9, 9)
-        elif num_pic == 10:
-            pic_order = '25'
-            figure = (18, 9)
-        elif num_pic == 12:
-            pic_order = '34'
-            figure = (12, 9)
-        elif num_pic == 14:
-            pic_order = '27'
-            figure = (18, 6)
-        elif num_pic == 15:
-            pic_order = '35'
-            figure = (15, 9)
+        # 使用字典简化配置
+        size_config = {
+            4: ('22', (9, 9)),
+            6: ('23', (12, 9)),
+            8: ('24', (8, 14)),
+            9: ('33', (9, 9)),
+            10: ('25', (18, 9)),
+            12: ('34', (12, 9)),
+            14: ('27', (18, 6)),
+            15: ('35', (15, 9))
+        }
+
+        if num_pic in size_config:
+            pic_order, figure = size_config[num_pic]
         else:
-            pic_order = f'1{pic_order}'
+            pic_order = f'1{num_pic}'
             figure = (num_pic, 1)
 
-
     if len(pic_order) != 2:
-        print('pic order error:{}'.format(pic_order))
-    # 计算图像总数，并判断是否与输入数据相匹配
-    num = int(pic_order[0]) * int(pic_order[1])
+        print(f'pic order error: {pic_order}')
+        return
+
+    # 计算图像总数
+    rows, cols = map(int, pic_order)
+    num = rows * cols
+
     if num != len(pic_list):
-        print('pic order num is not equal to pic_list num:{},{}'.format(len(pic_list), pic_order))
-        exit(0)
+        print(f'pic order num is not equal to pic_list num: {len(pic_list)} vs {pic_order}')
+        return
 
-    while(len(pic_str) < len(pic_list)):
-        pic_str.append('pic_str'+str(len(pic_str)))
+    # 自动生成标题
+    pic_str += [f'Image {i + 1}' for i in range(len(pic_list) - len(pic_str))]
 
-    # 判断图像是否经过归一化了，如果图像经过了归一化那就将图像进行复原为[0, 255]的内容
-    for i in range(len(pic_list)):
-        if np.max(pic_list[i]) < 4.01:
-            pic_list[i] = 255*pic_list[i]
-        pic_list[i] = np.clip(pic_list[i], a_min=0, a_max=255)
+    # 预处理图像
+    processed_pics = []
+    for pic in pic_list:
+        # 归一化处理
+        if np.max(pic) < 4.01:
+            pic = 255 * pic
+        # 确保数据类型正确
+        pic = np.clip(pic, 0, 255).astype(np.uint8)
+
+        # 通道顺序调整
+        if len(pic.shape) == 3 and pic.shape[0] == 3:
+            pic = np.transpose(pic, (1, 2, 0))
+
+        processed_pics.append(pic)
 
     plt.close('all')
-    fig = plt.figure(figsize=figure)
-    fig.suptitle(title, font={'family': 'Arial', 'size': 18})
-    for i in range(len(pic_list)):
-        pic_temp = pic_list[i]
-        # print(pic_temp.shape)
-        if len(pic_list[i].shape) == 3:
-            if pic_list[i].shape[0] == 3:
-                pic_temp = pic_temp.transpose(1, 2, 0)
-                # print(pic_temp.shape)
+    fig, axes = plt.subplots(rows, cols, figsize=figure)
+    fig.suptitle(title, fontsize=18)
 
-        a = int(pic_order[0])
-        b = int(pic_order[1])
-        c = i + 1
-        # 当a,b,c大于等于10时 .add_subplot(a, b, c)
-        ax = fig.add_subplot(a, b, c)
-        # ax = fig.add_subplot(order_str)
-        ax.set_title(pic_str[i])
-        plt.axis('off')
-        if pic_temp.shape[-1] == 3:
-            ax.imshow(pic_temp.astype(np.uint8))
+    # 展平轴数组以便迭代
+    axes = axes.flatten() if rows > 1 or cols > 1 else [axes]
+
+    for i, (ax, pic, title_str) in enumerate(zip(axes, processed_pics, pic_str)):
+        ax.set_title(title_str)
+        ax.axis('off')
+
+        if len(pic.shape) == 3 and pic.shape[-1] == 3:
+            ax.imshow(pic)
         else:
-            ax.imshow(pic_temp.astype(np.uint8), cmap='hot')
-            # ax.imshow(pic_temp.astype(np.uint8), cmap='afmhot')
-            # ax.imshow(pic_temp.astype(np.uint8), cmap='gist_heat')
-            # ax.imshow(pic_temp.astype(np.uint8))
-
+            ax.imshow(pic, cmap='hot')  # 使用热力图显示单通道图像
 
     plt.tight_layout()
-    if path_save == '':
-        pass
-    else:
-        plt.savefig(path_save)
+    plt.subplots_adjust(top=0.9)  # 为标题留出空间
+
+    if path_save:
+        plt.savefig(path_save, bbox_inches='tight')
+
     if show:
-        plt.show()
+        try:
+            plt.show()
+        except Exception as e:
+            print(f"显示图像时出错: {e}")
+            print("尝试保存图像到临时文件...")
+            temp_path = "temp_plot.png"
+            plt.savefig(temp_path)
+            print(f"图像已保存到: {temp_path}")
+
     plt.close()
+
+
+
+
 
 # 图像缩放，输入是Pic_list=[Pic1, Pic2.............]
 def WindowsDataZoomer_PicList(pic_list, ExtremeRatio=0.02, USE_EXTRE=False, Max_V=-1, Min_V=-1):

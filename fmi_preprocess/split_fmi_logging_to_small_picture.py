@@ -6,7 +6,7 @@ from src_ele.dir_operation import search_files_by_criteria
 if __name__ == '__main__':
     path_input_folder = r'F:\DeepLData\FMI_SIMULATION'
     target_folder = r'F:\DeepLData\simulate_fmi_small_big_mix'
-    WINDOWS_LENGTH = [300, 500]
+    WINDOWS_LENGTH = [200, 400]
     WINDOWS_STEP = 150
 
     for i in range(20):

@@ -12,6 +12,7 @@ from train_pix2pix_simulate.datasets import ImageDataset_FMI
 from train_pix2pix_simulate.model_discriminator import EnhancedDiscriminator
 from train_pix2pix_simulate.models_generator import weights_init_normal, GeneratorUNet
 from train_pix2pix_simulate.ssim_geo import GeologicalSSIM
+from train_pix2pix_simulate.ssim_loss import MSSSIM
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--epoch", type=int, default=0, help="epoch to start training from")
@@ -21,22 +22,19 @@ parser.add_argument("--n_epochs", type=int, default=10, help="number of epochs o
 parser.add_argument("--img_size_x", type=int, default=256, help="size of image height")
 parser.add_argument("--img_size_y", type=int, default=256, help="size of image width")
 parser.add_argument("--batch_size", type=int, default=32, help="size of the batches")
-parser.add_argument("--n_cpu", type=int, default=6, help="number of cpu threads to use during batch generation")
-parser.add_argument("--dataset_path_val", type=str, default=r"D:\DeepLData\GAN_Fracture_layer", help="path of the valide dataset")
-parser.add_argument("--dataset_path", type=str, default=r"D:\DeepLData\target_stage1_small_big_mix", help="path of the train dataset")
-# # parser.add_argument("--dataset_path", type=str, default=r"/root/autodl-tmp/data/GAN_Fracture_layer", help="path of the train dataset")
-# parser.add_argument("--dataset_path", type=str, default=r"D:\Data\target_stage1_small_big_mix", help="path of the dataset")
-# parser.add_argument("--dataset_path_val", type=str, default=r"D:\Data\GAN_Fracture_layer", help="path of the dataset")
+parser.add_argument("--n_cpu", type=int, default=8, help="number of cpu threads to use during batch generation")
+parser.add_argument("--dataset_path_val", type=str, default=r"F:\DeepLData\target_stage1_small_big_mix", help="path of the valide dataset")
+parser.add_argument("--dataset_path", type=str, default=r"F:\DeepLData\target_stage1_small_big_mix", help="path of the train dataset")
 
-parser.add_argument("--channels_in", type=int, default=8, help="number of image channels")
-parser.add_argument("--channels_out", type=int, default=2, help="number of image channels")
+parser.add_argument("--channels_in", type=int, default=1, help="number of image channels")
+parser.add_argument("--channels_out", type=int, default=1, help="number of image channels")
 parser.add_argument("--lr", type=float, default=0.0001, help="adam: learning rate")
 parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")
 parser.add_argument("--b2", type=float, default=0.999, help="adam: decay of first order momentum of gradient")
 parser.add_argument("--decay_epoch", type=int, default=50, help="epoch from which to start lr decay")
 parser.add_argument("--sample_interval", type=int, default=50, help="interval between sampling of images from generators")
 parser.add_argument("--checkpoint_interval", type=int, default=2, help="interval between model_fmi checkpoints")
-parser.add_argument("--dataset_name", type=str, default='pic2pic', help="folder to save model")
+parser.add_argument("--dataset_name", type=str, default='FMI_CGAN_repair', help="folder to save model")
 # parser.add_argument("--netG", type=str, default=r'/root/autodl-tmp/FMI_GAN/pix2pix/saved_models/pic2pic/generator_104.pth', help="path model Gen")
 # parser.add_argument("--netD", type=str, default=r'/root/autodl-tmp/FMI_GAN/pix2pix/saved_models/pic2pic/discriminator_104.pth', help="path model Discrimi")
 parser.add_argument("--netG", type=str, default=r'', help="path model Gen")
@@ -60,7 +58,6 @@ if __name__ == '__main__':
 
     # Loss functions
     criterion_MSE = torch.nn.MSELoss()
-    # criterion_ssim = MSSSIM(window_size=27, channel=2)
     criterion_ssim = GeologicalSSIM(window_size=27, channel=2)
 
     # Calculate output of image discriminator (PatchGAN)

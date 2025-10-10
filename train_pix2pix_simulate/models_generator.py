@@ -96,7 +96,6 @@ class GeneratorUNet(nn.Module):
         d6 = self.down6(d5)
         d7 = self.down7(d6)
         d8 = self.down8(d7)
-        # print(x.shape, d1.shape, d2.shape, d3.shape, d4.shape, d5.shape, d6.shape, d7.shape, d8.shape)
 
         u1 = self.up1(d8, d7)
         u2 = self.up2(u1, d6)
@@ -105,7 +104,6 @@ class GeneratorUNet(nn.Module):
         u5 = self.up5(u4, d3)
         u6 = self.up6(u5, d2)
         u7 = self.up7(u6, d1)
-        # print(u1.shape, u2.shape, u3.shape, u4.shape, u5.shape, u6.shape, u7.shape)
         return self.final(u7)
 
 
