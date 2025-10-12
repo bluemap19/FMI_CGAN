@@ -17,27 +17,27 @@ from train_repair_CGAN_model.MODEL_Generator_UNET import GeneratorUNet
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--epoch", type=int, default=0, help="epoch to start training from")
-parser.add_argument("--n_epochs", type=int, default=10, help="number of epochs of training")
+parser.add_argument("--n_epochs", type=int, default=5, help="number of epochs of training")
 parser.add_argument("--img_length", type=int, default=128, help="size of image height")
 parser.add_argument("--FMI_padding_length", type=int, default=16, help="size of image height")
-parser.add_argument("--batch_size", type=int, default=58, help="size of the batches")
-parser.add_argument("--num_workers", type=int, default=8, help="number of cpu threads to use during batch generation")
+parser.add_argument("--batch_size", type=int, default=52, help="size of the batches")
+parser.add_argument("--num_workers", type=int, default=6, help="number of cpu threads to use during batch generation")
 parser.add_argument("--dataset_path_val", type=str, default=r"F:\DeepLData\target_stage1_small_big_mix", help="path of the valide dataset")
 parser.add_argument("--dataset_path", type=str, default=r"F:\DeepLData\target_stage1_small_big_mix", help="path of the train dataset")
 
 parser.add_argument("--channels_in", type=int, default=1, help="number of image channels")
 parser.add_argument("--channels_out", type=int, default=1, help="number of image channels")
 parser.add_argument("--lr", type=float, default=0.005, help="adam: learning rate")
-parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")
-parser.add_argument("--b2", type=float, default=0.999, help="adam: decay of first order momentum of gradient")
-parser.add_argument("--decay_epoch", type=int, default=50, help="epoch from which to start lr decay")
+parser.add_argument("--b1", type=float, default=0.6, help="adam: decay of first order momentum of gradient")
+parser.add_argument("--b2", type=float, default=0.99, help="adam: decay of first order momentum of gradient")
+parser.add_argument("--decay_epoch", type=int, default=100, help="epoch from which to start lr decay")
 parser.add_argument("--sample_interval", type=int, default=200, help="interval between sampling of images from generators")
 parser.add_argument("--checkpoint_interval", type=int, default=2, help="interval between model_fmi checkpoints")
 parser.add_argument("--dataset_name", type=str, default='FMI_CGAN_repair', help="folder to save model")
-# parser.add_argument("--netG", type=str, default=r'/root/autodl-tmp/FMI_GAN/pix2pix/saved_models/pic2pic/generator_104.pth', help="path model Gen")
-# parser.add_argument("--netD", type=str, default=r'/root/autodl-tmp/FMI_GAN/pix2pix/saved_models/pic2pic/discriminator_104.pth', help="path model Discrimi")
-parser.add_argument("--netG", type=str, default=r'', help="path model Gen")
-parser.add_argument("--netD", type=str, default=r'', help="path model Discrimi")
+parser.add_argument("--netG", type=str, default=r'D:\GitHub\FMI_CGAN\train_repair_CGAN_model\saved_models\FMI_CGAN_repair\4\model_ele_gen_22800.pth', help="path model Gen")
+parser.add_argument("--netD", type=str, default=r'D:\GitHub\FMI_CGAN\train_repair_CGAN_model\saved_models\FMI_CGAN_repair\4\model_ele_dis_22800.pth', help="path model Discrimi")
+# parser.add_argument("--netG", type=str, default=r'', help="path model Gen")
+# parser.add_argument("--netD", type=str, default=r'', help="path model Discrimi")
 opt = parser.parse_args()
 print(opt)
 
@@ -202,22 +202,22 @@ if __name__ == '__main__':
             # 总损失
             # loss_G = 0.05 * (loss_input_DIS+loss_target_DIS)/2 + 0.3 * (loss_ssim_GEN_all+loss_mse_GEN_all)/2 + 0.3*(loss_ssim_GEN_deduction+loss_mse_GEN_deduction)/2 + 0.3*loss_cross_entropy
             # loss_G = 0.02*(loss_input_DIS+loss_target_DIS)/2 + 0.4*(loss_mse_GEN_all+loss_mse_GEN_deduction)/2 + 0.2*loss_ssim_GEN_all + 0.3*loss_cross_entropy
-            loss_G = (
-                    0.02 * (loss_input_DIS + loss_target_DIS) / 2 +  # 判别器损失权重降低
-                    0.20 * loss_mse_GEN_all +  # 整体MSE权重增加
-                    0.20 * loss_mse_GEN_deduction +  # 修复区域MSE权重增加
-                    0.20 * loss_ssim_GEN_all +  # 整体SSIM权重
-                    0.30 * loss_cross_entropy   # 整体交叉熵特征相似度
-            )
-            # loss_G = 0.02*(loss_input_DIS+loss_target_DIS)/2 + 0.2*loss_mse_GEN_all + 0.3+loss_mse_GEN_deduction + 0.2*loss_ssim_GEN_all + 0.2*loss_cross_entropy_fake_real_all + 0.1*loss_cross_entropy_fake_target
             # loss_G = (
             #         0.02 * (loss_input_DIS + loss_target_DIS) / 2 +  # 判别器损失权重降低
             #         0.20 * loss_mse_GEN_all +  # 整体MSE权重增加
-            #         0.30 * loss_mse_GEN_deduction +  # 修复区域MSE权重增加
-            #         0.25 * loss_ssim_GEN_all +  # 整体SSIM权重
-            #         0.15 * loss_cross_entropy_fake_real_all +  # 整体交叉熵特征相似度
-            #         0.08 * loss_cross_entropy_fake_target  # 修复区域交叉熵特征相似度
+            #         0.20 * loss_mse_GEN_deduction +  # 修复区域MSE权重增加
+            #         0.20 * loss_ssim_GEN_all +  # 整体SSIM权重
+            #         0.30 * loss_cross_entropy   # 整体交叉熵特征相似度
             # )
+            # loss_G = 0.02*(loss_input_DIS+loss_target_DIS)/2 + 0.2*loss_mse_GEN_all + 0.3+loss_mse_GEN_deduction + 0.2*loss_ssim_GEN_all + 0.2*loss_cross_entropy_fake_real_all + 0.1*loss_cross_entropy_fake_target
+            loss_G = (
+                    0.02 * (loss_input_DIS + loss_target_DIS) / 2 +  # 判别器损失权重降低
+                    0.20 * loss_mse_GEN_all +  # 整体MSE权重增加
+                    0.30 * loss_mse_GEN_deduction +  # 修复区域MSE权重增加
+                    0.25 * loss_ssim_GEN_all +  # 整体SSIM权重
+                    0.15 * loss_cross_entropy_fake_real_all +  # 整体交叉熵特征相似度
+                    0.08 * loss_cross_entropy_fake_target  # 修复区域交叉熵特征相似度
+            )
 
             loss_G.backward()
             optimizer_G.step()
@@ -318,60 +318,60 @@ if __name__ == '__main__':
             if batches_done % opt.sample_interval == 0:
                 sample_images(real_all, real_input, mask, batches_done)
 
-        with (torch.no_grad()):
-            # 进行模型的测试
-            generator.eval()
-            val_mse_losses = []
-            val_ssim_losses = []
-            val_cross_entropy_losses = []
-            with torch.no_grad():
-                for i, batch in enumerate(dataloader_val):
-                    real_all = Variable(batch["real_all"].type(Tensor))                         # 完整的图像
-                    real_input = Variable(batch["real_input"].type(Tensor))                     # 图像被遮掩后的部分，也是图像修复模型的输入
-                    real_target = Variable(batch["real_deduction"].type(Tensor))             # 图像被遮掩的部分，也是模型要进行修复的部分
-                    mask = Variable(batch["mask"].type(Tensor))                                 # 图像的空白条带掩码，其中的0是图像保存的部分，其中的1是空白条带部分
-
-                    data_input = torch.cat((real_input, mask), dim=1)
-                    model_generate_all = generator(data_input)
-                    generate_target = mask * model_generate_all
-
-                    # 重建MSE损失--->总的
-                    loss_ssim_GEN_all = criterion_ssim(model_generate_all, real_all)
-                    loss_mse_GEN_all = criterion_MSE(model_generate_all, real_all)
-
-                    # 重建SSIM损失--->待修复部分
-                    loss_ssim_GEN_deduction = criterion_ssim(generate_target, real_target)
-                    loss_mse_GEN_deduction = criterion_MSE(generate_target, real_target)
-
-                    # 重建 交叉熵cross_entropy 损失--->总的
-                    loss_cross_entropy_fake_real_all = cosine_similarity_loss(flatten_features(model_generate_all), flatten_features(real_all))
-                    loss_cross_entropy_fake_target = cosine_similarity_loss(flatten_features(real_target), flatten_features(generate_target))
-                    loss_cross_entropy = (7 * loss_cross_entropy_fake_real_all + 3 * loss_cross_entropy_fake_target) / 10
-                    loss_G = 0.2*loss_mse_GEN_all + 0.3+loss_mse_GEN_deduction +0.2*loss_ssim_GEN_all + 0.2*loss_cross_entropy_fake_real_all + 0.1*loss_cross_entropy_fake_target
-
-                    val_mse_losses.append((loss_mse_GEN_all.item()+loss_mse_GEN_deduction.item())/2)
-                    val_ssim_losses.append((loss_ssim_GEN_all.item()+loss_ssim_GEN_deduction.item())/2)
-                    val_cross_entropy_losses.append(loss_cross_entropy.item())
-                    log_val.append([epoch, opt.n_epochs, i, len(dataloader),
-                                      loss_ssim_GEN_all.item(), loss_mse_GEN_all.item(),
-                                      loss_ssim_GEN_deduction.item(), loss_mse_GEN_deduction.item(),
-                                      loss_cross_entropy.item(), loss_G.item(),
-                                      optimizer_G.state_dict()['param_groups'][0]['lr'],
-                                      optimizer_D.state_dict()['param_groups'][0]['lr']])
-
-            avg_mse_loss = sum(val_mse_losses) / len(val_mse_losses)
-            avg_ssim_loss = sum(val_ssim_losses) / len(val_ssim_losses)
-            avg_cs_loss = sum(val_cross_entropy_losses) / len(val_cross_entropy_losses)
-            avg_val_loss = 0.2*avg_ssim_loss + 0.3*avg_mse_loss + 0.2*avg_cs_loss
-            print(f"\nValidation Loss: {avg_val_loss:.4f}")
-
-            # 保存最佳模型
-            if loss_G < best_val_loss:
-                best_val_loss = loss_G
-                torch.save(generator.state_dict(), f"saved_models/{opt.dataset_name}/best_generator.pth")
-                torch.save(discriminator.state_dict(), f"saved_models/{opt.dataset_name}/best_discriminator.pth")
-
-            generator.train()
+        # with (torch.no_grad()):
+        #     # 进行模型的测试
+        #     generator.eval()
+        #     val_mse_losses = []
+        #     val_ssim_losses = []
+        #     val_cross_entropy_losses = []
+        #     with torch.no_grad():
+        #         for i, batch in enumerate(dataloader_val):
+        #             real_all = Variable(batch["real_all"].type(Tensor))                         # 完整的图像
+        #             real_input = Variable(batch["real_input"].type(Tensor))                     # 图像被遮掩后的部分，也是图像修复模型的输入
+        #             real_target = Variable(batch["real_deduction"].type(Tensor))             # 图像被遮掩的部分，也是模型要进行修复的部分
+        #             mask = Variable(batch["mask"].type(Tensor))                                 # 图像的空白条带掩码，其中的0是图像保存的部分，其中的1是空白条带部分
+        #
+        #             data_input = torch.cat((real_input, mask), dim=1)
+        #             model_generate_all = generator(data_input)
+        #             generate_target = mask * model_generate_all
+        #
+        #             # 重建MSE损失--->总的
+        #             loss_ssim_GEN_all = criterion_ssim(model_generate_all, real_all)
+        #             loss_mse_GEN_all = criterion_MSE(model_generate_all, real_all)
+        #
+        #             # 重建SSIM损失--->待修复部分
+        #             loss_ssim_GEN_deduction = criterion_ssim(generate_target, real_target)
+        #             loss_mse_GEN_deduction = criterion_MSE(generate_target, real_target)
+        #
+        #             # 重建 交叉熵cross_entropy 损失--->总的
+        #             loss_cross_entropy_fake_real_all = cosine_similarity_loss(flatten_features(model_generate_all), flatten_features(real_all))
+        #             loss_cross_entropy_fake_target = cosine_similarity_loss(flatten_features(real_target), flatten_features(generate_target))
+        #             loss_cross_entropy = (7 * loss_cross_entropy_fake_real_all + 3 * loss_cross_entropy_fake_target) / 10
+        #             loss_G = 0.2*loss_mse_GEN_all + 0.3+loss_mse_GEN_deduction +0.2*loss_ssim_GEN_all + 0.2*loss_cross_entropy_fake_real_all + 0.1*loss_cross_entropy_fake_target
+        #
+        #             val_mse_losses.append((loss_mse_GEN_all.item()+loss_mse_GEN_deduction.item())/2)
+        #             val_ssim_losses.append((loss_ssim_GEN_all.item()+loss_ssim_GEN_deduction.item())/2)
+        #             val_cross_entropy_losses.append(loss_cross_entropy.item())
+        #             log_val.append([epoch, opt.n_epochs, i, len(dataloader),
+        #                               loss_ssim_GEN_all.item(), loss_mse_GEN_all.item(),
+        #                               loss_ssim_GEN_deduction.item(), loss_mse_GEN_deduction.item(),
+        #                               loss_cross_entropy.item(), loss_G.item(),
+        #                               optimizer_G.state_dict()['param_groups'][0]['lr'],
+        #                               optimizer_D.state_dict()['param_groups'][0]['lr']])
+        #
+        #     avg_mse_loss = sum(val_mse_losses) / len(val_mse_losses)
+        #     avg_ssim_loss = sum(val_ssim_losses) / len(val_ssim_losses)
+        #     avg_cs_loss = sum(val_cross_entropy_losses) / len(val_cross_entropy_losses)
+        #     avg_val_loss = 0.2*avg_ssim_loss + 0.3*avg_mse_loss + 0.2*avg_cs_loss
+        #     print(f"\nValidation Loss: {avg_val_loss:.4f}")
+        #
+        #     # 保存最佳模型
+        #     if loss_G < best_val_loss:
+        #         best_val_loss = loss_G
+        #         torch.save(generator.state_dict(), f"saved_models/{opt.dataset_name}/best_generator.pth")
+        #         torch.save(discriminator.state_dict(), f"saved_models/{opt.dataset_name}/best_discriminator.pth")
+        # 
+        #     generator.train()
 
         np.savetxt('Train_simulate_model_log_{}.txt'.format(epoch), np.array(log_train), delimiter='\t', comments='',newline='\n', fmt='%.4f')
         np.savetxt('Valide_simulate_model_log_{}.txt'.format(epoch), np.array(log_val), delimiter='\t', comments='',newline='\n', fmt='%.4f')

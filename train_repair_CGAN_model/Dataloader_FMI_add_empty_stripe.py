@@ -193,43 +193,49 @@ class dataloader_padding_striped(Dataset):
 
 # 用来进行图像修复的dataloader，使用模型进行修复时，使用此dataloader
 class dataloader_FMI_logging(Dataset):
-    def __init__(self, path=r'F:\DeepLData\FMI_SIMULATION\simu_FMI\0_fmi_dyna.png', padding=16, len_windows=256, step_windows=10, pic_length_target=128, mask_config={'ratio_empty':0.2, 'num_belt':6}):
+    def __init__(self, path=r'F:\DeepLData\FMI_SIMULATION\simu_FMI\0_fmi_dyna.png', padding=16, len_windows=256, step_windows=10, pic_length_target=128, mask_config={'ratio_empty':0.2, 'num_belt':6, 'rotate_rb':True}):
         super().__init__()
         """
         path:输入的文件路径
+        padding:左右两边padding长度大小
         len_windows:图像分割的窗长大小
+        step_windows:步长，窗口遍历的步长
         pic_length_target:图像输出的窗长大小
-        step_windows:
-        mask:
+        mask_config:掩码配置
         """
         self.pic_origin = cv2.imread(path, cv2.IMREAD_GRAYSCALE)            # 图像读取
         self.pic_origin_padding = FMI_padding(self.pic_origin, padding)     # 图像加padding，用来进行辅助修复
         self.len_windows = len_windows                                      # 图像遍历窗口长度设置
-        self.length_target = pic_length_target
-        self.step_windows = step_windows
-        self.length = (self.pic_origin.shape[0]-len_windows)//self.step_windows + 2
-        self.pic_shape_target = (pic_length_target, pic_length_target)
-        self.pic_shape_windows_org = (self.pic_origin_padding.shape[1], len_windows)
-        self.padding = padding
+        self.length_target = pic_length_target                              # 输出图像边长，方形的
+        self.pic_shape_target = (pic_length_target, pic_length_target)      # 输出图像形状
+        self.step_windows = step_windows                                    # 遍历的窗口步长
+        self.length = (self.pic_origin.shape[0]-len_windows)//self.step_windows+2           # 数据集的长度
+        self.pic_shape_windows_org = (self.pic_origin_padding.shape[1], len_windows)        # 原始的图像形状
+        self.padding = padding                                              # 左右padding length 设置
 
-        mask_config_default = {'ratio_empty':np.random.choice([0.1, 0.15, 0.2, 0.25, 0.3]), 'num_belt':np.random.choice([6, 6, 6, 8, 8, 10]), 'rotate_rb':np.random.choice([True, False])}
-        # 合并配置参数
-        mask_config = {**mask_config_default, **mask_config}
-        # 极板个数初始化
-        num_belt = mask_config['num_belt']
-        # 空白率初始化
-        ratio_empty = mask_config['ratio_empty']
-        # 是否进行绕井壁旋转
-        rotate_rb = mask_config['rotate_rb']
-        # 获得掩码图像
-        mask = get_pic_mask_random(pic_shape=self.pic_origin.shape, mask_ratio=ratio_empty, num_belt=num_belt)
-        self.mask_padding = FMI_padding(mask, self.padding)
-        if rotate_rb:
-            self.mask_padding, rb_random = pic_rotate_random(self.mask_padding)
-        self.pic_masked_padding = self.pic_origin_padding * self.mask_padding
+        if mask_config:
+            mask_config_default = {'ratio_empty':np.random.choice([0.1, 0.15, 0.2, 0.25, 0.3]), 'num_belt':np.random.choice([6, 6, 6, 8, 8, 10]), 'rotate_rb':np.random.choice([True, False])}
+            # 合并配置参数
+            mask_config = {**mask_config_default, **mask_config}
+            # 极板个数初始化
+            num_belt = mask_config['num_belt']
+            # 空白率初始化
+            ratio_empty = mask_config['ratio_empty']
+            # 是否进行绕井壁旋转
+            rotate_rb = mask_config['rotate_rb']
+            # 获得掩码图像
+            mask = get_pic_mask_random(pic_shape=self.pic_origin.shape, mask_ratio=ratio_empty, num_belt=num_belt)
+            self.mask_padding = FMI_padding(mask, self.padding)
+            if rotate_rb:
+                self.mask_padding, rb_random = pic_rotate_random(self.mask_padding)
+            self.pic_masked_padding = self.pic_origin_padding * self.mask_padding
+        else:
+            self.mask_padding = cv2.threshold(self.pic_origin_padding, 10, 255, cv2.THRESH_BINARY)
+            self.pic_masked_padding = self.pic_origin_padding * self.mask_padding
+
 
     def __getitem__(self, index):
-        if index != self.length - 1:
+        if index != self.length-1:
             image_masked = self.pic_masked_padding[index*self.step_windows:index*self.step_windows+self.len_windows, :]
             image_origin = self.pic_origin[index*self.step_windows:index*self.step_windows+self.len_windows, :]
             image_mask = self.mask_padding[index*self.step_windows:index*self.step_windows+self.len_windows, :]
@@ -238,6 +244,7 @@ class dataloader_FMI_logging(Dataset):
             image_origin = self.pic_origin[-self.len_windows:, :]
             image_mask = self.mask_padding[-self.len_windows:, :]
 
+        # 形状变换
         image_masked = cv2.resize(image_masked, self.pic_shape_target)
         image_origin = cv2.resize(image_origin, self.pic_shape_target)
         image_mask = cv2.resize(image_mask, self.pic_shape_target)
@@ -259,24 +266,29 @@ class dataloader_FMI_logging(Dataset):
     def __len__(self):
         return self.length
 
-    def combine_pic_list(self, pic_array_list, path_target_folder=''):
+    # 把修复后的图像进行合并成与输入图像一样的图像格式、形状
+    def combine_pic_list(self, pic_array_list, path_target_folder='', str_charter='SIMU_1'):
         """
-        pic_array_list: array1.shape=[64,1,128,128]
+        pic_array_list: array1.shape=[357,1,128,128] ----> 1000*256
         """
-        pic_result = np.zeros_like(self.pic_origin_padding, dtype=np.float32)
-        pic_weight = np.zeros_like(pic_result, dtype=np.float32)
+        pic_result = np.zeros_like(self.pic_origin_padding, dtype=np.float32)   # 结果保存数据
+        pic_weight = np.zeros_like(pic_result, dtype=np.float32)                # 预测结果的权重数据
 
         # 图像加权拼接
         for i in range(pic_array_list.shape[0]):
             image_t = pic_array_list[i, 0, :, :]
             image_resize = cv2.resize(image_t, self.pic_shape_windows_org)
-
-            if i != self.length-1:
+            if i == 0:
                 pic_result[i*self.step_windows:i*self.step_windows+self.len_windows, :] += image_resize
                 pic_weight[i*self.step_windows:i*self.step_windows+self.len_windows, :] += 1
+            elif i != self.length-1:
+                pic_result[i*self.step_windows+self.step_windows:i*self.step_windows+self.len_windows-self.step_windows, :] += image_resize[self.step_windows:-self.step_windows, :]
+                pic_weight[i*self.step_windows+self.step_windows:i*self.step_windows+self.len_windows-self.step_windows, :] += 1
             else:
                 pic_result[-self.len_windows:, :] += image_resize
                 pic_weight[-self.len_windows:, :] += 1
+            # show_Pic([image_resize, image_t])
+
         # 图像的权重剔除，并进行图像阈值恢复，将图像缩放到0-255范围内
         pic_result = (pic_result/pic_weight)*255
 
@@ -286,12 +298,15 @@ class dataloader_FMI_logging(Dataset):
         # 图像裁剪，才调用来进行辅助恢复的左右两边的padding范围，并进行数值类型改变
         pic_result = pic_result[:, self.padding:-self.padding].astype(np.uint8)
         pic_result_target = pic_result_target[:, self.padding:-self.padding].astype(np.uint8)
+        pic_mask = self.mask_padding[:, self.padding:-self.padding].astype(np.uint8) * 255
 
         # 图像保存
         if path_target_folder != '':
             print('path_save:{}'.format(path_target_folder))
-            cv2.imwrite(path_target_folder+r'\pic_result_target.png', pic_result_target)
-            cv2.imwrite(path_target_folder+r'\pic_result.png', pic_result)
+            cv2.imwrite(path_target_folder+'\\{}_target_result.png'.format(str_charter), pic_result_target)
+            cv2.imwrite(path_target_folder+'\\{}_model_result.png'.format(str_charter), pic_result)
+            cv2.imwrite(path_target_folder+'\\{}_mask.png'.format(str_charter), pic_mask)
+            cv2.imwrite(path_target_folder+'\\{}_org.png'.format(str_charter), self.pic_origin)
 
         return pic_result, pic_result_target
 
