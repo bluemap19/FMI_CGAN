@@ -370,7 +370,7 @@ if __name__ == '__main__':
         #         best_val_loss = loss_G
         #         torch.save(generator.state_dict(), f"saved_models/{opt.dataset_name}/best_generator.pth")
         #         torch.save(discriminator.state_dict(), f"saved_models/{opt.dataset_name}/best_discriminator.pth")
-        # 
+        #
         #     generator.train()
 
         np.savetxt('Train_simulate_model_log_{}.txt'.format(epoch), np.array(log_train), delimiter='\t', comments='',newline='\n', fmt='%.4f')

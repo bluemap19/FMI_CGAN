@@ -101,11 +101,6 @@ def pic_crop_random(pic, pic_shape_ratio=None):
 class dataloader_padding_striped(Dataset):
     def __init__(self, path=r'F:\DeepLData\target_stage1_small_big_mix', len_pic=256, padding=16):
         super().__init__()
-        """
-        path string :
-        len_pic int :
-        padding int :
-        """
         self.target_list_file_path = get_all_file_paths(path)
         self.length = len(self.target_list_file_path)
         self.pic_shape = (len_pic, len_pic)
@@ -113,13 +108,19 @@ class dataloader_padding_striped(Dataset):
 
     def __getitem__(self, index):
         path_t = self.target_list_file_path[index]
-        if not (path_t.endswith('.jpg') or path_t.endswith('.png')):
-            print(path_t+' is not a picture.........')
-            exit(0)
+        if not (path_t.lower().endswith(('.jpg', '.png', '.jpeg'))):
+            print(f"跳过非图片文件: {path_t}")
+            return self._get_dummy_item()
 
         # 常规图片的 空白条带图像生成
         if path_t.__contains__('REAL_WORLD_PIC'):
             image_origin = cv2.imread(self.target_list_file_path[index], cv2.IMREAD_COLOR_RGB)
+
+            # 添加检查
+            if image_origin is None:
+                print(f"无法读取图像: {self.target_list_file_path[index]}")
+                # 返回一个替代图像或跳过
+                return self._get_dummy_item()
 
             # 常规的图像的话，随机选择一个channel，不使用所有的channel
             channel = np.random.randint(0, 3)
@@ -189,7 +190,21 @@ class dataloader_padding_striped(Dataset):
     def __len__(self):
         return self.length
 
+    def _get_dummy_item(self):
+        """创建一个替代图像项"""
+        dummy_img = np.zeros(self.pic_shape, dtype=np.uint8)
+        dummy_mask = np.zeros(self.pic_shape, dtype=np.uint8)
 
+        # 添加通道维度
+        dummy_img = np.expand_dims(dummy_img, axis=0)
+        dummy_mask = np.expand_dims(dummy_mask, axis=0)
+
+        return {
+            "real_all": dummy_img,
+            "mask": dummy_mask,
+            "real_input": dummy_img,
+            "real_deduction": dummy_img
+        }
 
 # 用来进行图像修复的dataloader，使用模型进行修复时，使用此dataloader
 class dataloader_FMI_logging(Dataset):
