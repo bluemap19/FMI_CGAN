@@ -54,7 +54,7 @@ class ModelVGGDiscriminator(nn.Module):
         return content_loss
 
 class EnhancedDiscriminator(nn.Module):
-    def __init__(self, in_channels=8, use_attention=True, spectral_norm=True):
+    def __init__(self, in_channels=8, spectral_norm=True):
         super(EnhancedDiscriminator, self).__init__()
 
         # 多尺度判别器结构 [7](@ref)

@@ -2,7 +2,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch
 from torchvision.models import vgg16, VGG16_Weights
-# from einops import rearrange, reduce
 
 
 class ResidualBlock(nn.Module):
@@ -178,6 +177,8 @@ class GeneratorUNet(nn.Module):
         u4 = self.up4(u3, d1)  # 128x128
         u5 = self.up5(u4, x0)  # 256x256
 
+        # print(d1.shape, d2.shape, d3.shape, d4.shape, d5.shape, b.shape, u1.shape, u2.shape, u3.shape, u4.shape, u5.shape)
+
         # 最终输出
         return self.final(u5)
 
@@ -200,25 +201,24 @@ if __name__ == '__main__':
     print(device)
 
     # 创建改进后的生成器
-    gen = GeneratorUNet(in_channels=6, out_channels=2).to(device)
+    gen = GeneratorUNet(in_channels=2, out_channels=2).to(device)
     print(f"模型参数量: {sum(p.numel() for p in gen.parameters()) / 1e6:.2f}M")
 
     # 测试输入输出
-    v1 = torch.randn((5, 6, 256, 256)).to(device)
+    v1 = torch.randn((32, 2, 256, 256)).to(device)
     output = gen(v1)
     print(f"输入形状: {v1.shape}, 输出形状: {output.shape}")
 
-    # 测试感知损失（当输出通道为3时）
-    gen_rgb = GeneratorUNet(in_channels=6, out_channels=3).to(device)
-    v2 = torch.randn((5, 3, 256, 256)).to(device)
-    loss = gen_rgb.perceptual_loss(output, v2)  # 这里仅为演示，实际应使用真实目标
-    print(f"感知损失: {loss}")
+    # # 测试感知损失（当输出通道为3时）
+    # gen_rgb = GeneratorUNet(in_channels=6, out_channels=3).to(device)
+    # v2 = torch.randn((5, 3, 256, 256)).to(device)
+    # loss = gen_rgb.perceptual_loss(output, v2)  # 这里仅为演示，实际应使用真实目标
+    # print(f"感知损失: {loss}")
+    #
+    # # 内存占用测试
+    # torch.cuda.empty_cache()
+    # with torch.no_grad():
+    #     large_input = torch.randn((1, 6, 512, 512)).to(device)
+    #     large_output = gen(large_input)
+    #     print(f"大尺寸输入输出测试成功: {large_output.shape}")
 
-    # 内存占用测试
-    torch.cuda.empty_cache()
-    with torch.no_grad():
-        large_input = torch.randn((1, 6, 512, 512)).to(device)
-        large_output = gen(large_input)
-        print(f"大尺寸输入输出测试成功: {large_output.shape}")
-
-        

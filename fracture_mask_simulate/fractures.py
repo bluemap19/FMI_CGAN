@@ -2,7 +2,6 @@ import copy
 import cv2
 import numpy as np
 import random
-from src_ele.dir_operation import traverseFolder
 from src_ele.file_operation import get_ele_data_from_path
 from src_ele.pic_opeeration import show_Pic
 from PIL import Image, ImageDraw

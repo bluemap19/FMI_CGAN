@@ -1,1 +1,3 @@
 /train_pix2pix_simulate/SSIM20%/best_generator.pth
+/train_repair_CGAN_model/saved_models/
+/train_repair_CGAN_model/images/
