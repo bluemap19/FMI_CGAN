@@ -8,34 +8,35 @@ from torchvision.utils import save_image
 from torch.utils.data import DataLoader
 from torch.autograd import Variable
 import torch
-
 from src_ele.pic_opeeration import show_Pic
 from train_pix2pix_simulate.ssim_geo import GeologicalSSIM
 from train_repair_CGAN_model.Dataloader_FMI_add_empty_stripe import dataloader_padding_striped
 from train_repair_CGAN_model.MODEL_Discriminator_CGAN_repair import EnhancedDiscriminator
 from train_repair_CGAN_model.MODEL_Generator_UNET import GeneratorUNet
+from train_repair_CGAN_model.MODEL_Generator_prompt2 import GeneratorUNetImproved
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--epoch", type=int, default=0, help="epoch to start training from")
 parser.add_argument("--n_epochs", type=int, default=5, help="number of epochs of training")
 parser.add_argument("--img_length", type=int, default=128, help="size of image height")
 parser.add_argument("--FMI_padding_length", type=int, default=16, help="size of image height")
-parser.add_argument("--batch_size", type=int, default=52, help="size of the batches")
+parser.add_argument("--batch_size", type=int, default=64, help="size of the batches")
 parser.add_argument("--num_workers", type=int, default=6, help="number of cpu threads to use during batch generation")
-parser.add_argument("--dataset_path_val", type=str, default=r"F:\DeepLData\target_stage1_small_big_mix", help="path of the valide dataset")
-parser.add_argument("--dataset_path", type=str, default=r"F:\DeepLData\target_stage1_small_big_mix", help="path of the train dataset")
+parser.add_argument("--dataset_path_val", type=str, default=r"F:\DeepLData\target_stage1_small_big_mix\FMI_IMAGE", help="path of the valide dataset")
+# parser.add_argument("--dataset_path", type=str, default=r"F:\DeepLData\target_stage1_small_big_mix", help="path of the train dataset")
+parser.add_argument("--dataset_path", type=str, default=r"F:\DeepLData\target_stage1_small_big_mix\FMI_IMAGE", help="path of the train dataset")
 
 parser.add_argument("--channels_in", type=int, default=1, help="number of image channels")
 parser.add_argument("--channels_out", type=int, default=1, help="number of image channels")
-parser.add_argument("--lr", type=float, default=0.005, help="adam: learning rate")
-parser.add_argument("--b1", type=float, default=0.6, help="adam: decay of first order momentum of gradient")
-parser.add_argument("--b2", type=float, default=0.99, help="adam: decay of first order momentum of gradient")
+parser.add_argument("--lr", type=float, default=0.0002, help="adam: learning rate")
+parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")
+parser.add_argument("--b2", type=float, default=0.999, help="adam: decay of first order momentum of gradient")
 parser.add_argument("--decay_epoch", type=int, default=100, help="epoch from which to start lr decay")
 parser.add_argument("--sample_interval", type=int, default=200, help="interval between sampling of images from generators")
 parser.add_argument("--checkpoint_interval", type=int, default=2, help="interval between model_fmi checkpoints")
 parser.add_argument("--dataset_name", type=str, default='FMI_CGAN_repair', help="folder to save model")
-parser.add_argument("--netG", type=str, default=r'D:\GitHub\FMI_CGAN\train_repair_CGAN_model\saved_models\FMI_CGAN_repair\4\model_ele_gen_22800.pth', help="path model Gen")
-parser.add_argument("--netD", type=str, default=r'D:\GitHub\FMI_CGAN\train_repair_CGAN_model\saved_models\FMI_CGAN_repair\4\model_ele_dis_22800.pth', help="path model Discrimi")
+parser.add_argument("--netG", type=str, default=r'D:\GitHub\FMI_CGAN\train_repair_CGAN_model\saved_models\FMI_CGAN_repair\model_ele_gen_2000.pth', help="path model Gen")
+parser.add_argument("--netD", type=str, default=r'D:\GitHub\FMI_CGAN\train_repair_CGAN_model\saved_models\FMI_CGAN_repair\model_ele_dis_2000.pth', help="path model Discrimi")
 # parser.add_argument("--netG", type=str, default=r'', help="path model Gen")
 # parser.add_argument("--netD", type=str, default=r'', help="path model Discrimi")
 opt = parser.parse_args()
@@ -49,6 +50,7 @@ def cosine_similarity_loss(feat1, feat2):
     return 1 - (feat1_norm * feat2_norm).sum(dim=1).mean()
 
 
+
 if __name__ == '__main__':
     os.makedirs("images/%s" % opt.dataset_name, exist_ok=True)
     os.makedirs("saved_models/%s" % opt.dataset_name, exist_ok=True)
@@ -56,11 +58,13 @@ if __name__ == '__main__':
     cuda = True if torch.cuda.is_available() else False
 
     # Loss functions
-    criterion_MSE = torch.nn.MSELoss()          # MSE loss
+    # criterion_MSE = torch.nn.MSELoss()          # MSE loss
+    criterion_MSE = torch.nn.L1Loss()
     criterion_ssim = GeologicalSSIM(window_size=27, channel=opt.channels_out)       # SSIM loss
 
     # Initialize generator and discriminator
-    generator = GeneratorUNet(in_channels=opt.channels_in*2, out_channels=opt.channels_out)
+    # generator = GeneratorUNet(in_channels=opt.channels_in*2, out_channels=opt.channels_out)
+    generator = GeneratorUNetImproved(in_channels=opt.channels_in*2, out_channels=opt.channels_out)
     discriminator = EnhancedDiscriminator(in_channels=opt.channels_out+opt.channels_in)
 
     if cuda:
@@ -68,7 +72,6 @@ if __name__ == '__main__':
         discriminator = discriminator.cuda()
         criterion_MSE.cuda()
         criterion_ssim.cuda()
-        # criterion_cross_entropy.cuda()
 
     if opt.netG != '':
         print('from model continue to train.........')
@@ -82,15 +85,20 @@ if __name__ == '__main__':
 
     # Optimizers
     optimizer_G = torch.optim.Adam(generator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2))
+    # optimizer_G = torch.optim.Adam(generator.parameters(), lr=0.0001, betas=(0.5, 0.999))
     optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2))
 
     # 添加梯度裁剪
     torch.nn.utils.clip_grad_norm_(generator.parameters(), max_norm=1.0)
     torch.nn.utils.clip_grad_norm_(discriminator.parameters(), max_norm=1.0)
 
-    # 添加学习率衰减
-    scheduler_G = torch.optim.lr_scheduler.StepLR(optimizer_G, step_size=10, gamma=0.9)
-    scheduler_D = torch.optim.lr_scheduler.StepLR(optimizer_D, step_size=10, gamma=0.9)
+    # # 添加学习率衰减
+    # scheduler_G = torch.optim.lr_scheduler.StepLR(optimizer_G, step_size=10, gamma=0.9)
+    # scheduler_D = torch.optim.lr_scheduler.StepLR(optimizer_D, step_size=10, gamma=0.9)
+    # 使用余弦退火学习率
+    scheduler_G = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer_G, T_max=opt.n_epochs, eta_min=1e-6)
+    scheduler_D = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer_G, T_max=opt.n_epochs, eta_min=1e-6)
+
 
     dataloader = dataloader_padding_striped(opt.dataset_path, len_pic=opt.img_length, padding=opt.FMI_padding_length)
     dataloader = DataLoader(dataloader, shuffle=True, batch_size=opt.batch_size, drop_last=True, pin_memory=False, num_workers=opt.num_workers)
@@ -161,7 +169,6 @@ if __name__ == '__main__':
             data_input = torch.cat((real_input, mask), dim=1)
             model_generate_all = generator(data_input)
             generate_target = mask * model_generate_all
-
             # # 1. 从计算图中分离张量，避免影响梯度计算
             # with torch.no_grad():
             #     # 选择第一个样本进行展示
@@ -200,8 +207,6 @@ if __name__ == '__main__':
             loss_cross_entropy = (7*loss_cross_entropy_fake_real_all + 3*loss_cross_entropy_fake_target)/10
 
             # 总损失
-            # loss_G = 0.05 * (loss_input_DIS+loss_target_DIS)/2 + 0.3 * (loss_ssim_GEN_all+loss_mse_GEN_all)/2 + 0.3*(loss_ssim_GEN_deduction+loss_mse_GEN_deduction)/2 + 0.3*loss_cross_entropy
-            # loss_G = 0.02*(loss_input_DIS+loss_target_DIS)/2 + 0.4*(loss_mse_GEN_all+loss_mse_GEN_deduction)/2 + 0.2*loss_ssim_GEN_all + 0.3*loss_cross_entropy
             # loss_G = (
             #         0.02 * (loss_input_DIS + loss_target_DIS) / 2 +  # 判别器损失权重降低
             #         0.20 * loss_mse_GEN_all +  # 整体MSE权重增加
@@ -209,14 +214,29 @@ if __name__ == '__main__':
             #         0.20 * loss_ssim_GEN_all +  # 整体SSIM权重
             #         0.30 * loss_cross_entropy   # 整体交叉熵特征相似度
             # )
-            # loss_G = 0.02*(loss_input_DIS+loss_target_DIS)/2 + 0.2*loss_mse_GEN_all + 0.3+loss_mse_GEN_deduction + 0.2*loss_ssim_GEN_all + 0.2*loss_cross_entropy_fake_real_all + 0.1*loss_cross_entropy_fake_target
+            # loss_G = (
+            #         0.02 * (loss_input_DIS + loss_target_DIS) / 2 +  # 判别器损失权重降低
+            #         0.20 * loss_mse_GEN_all +  # 整体MSE权重增加
+            #         0.30 * loss_mse_GEN_deduction +  # 修复区域MSE权重增加
+            #         0.25 * loss_ssim_GEN_all +  # 整体SSIM权重
+            #         0.15 * loss_cross_entropy_fake_real_all +  # 整体交叉熵特征相似度
+            #         0.08 * loss_cross_entropy_fake_target  # 修复区域交叉熵特征相似度
+            # )
+            # loss_G = (
+            #         0.1 * (loss_input_DIS + loss_target_DIS) / 2 +  # 增加对抗损失权重
+            #         0.1 * loss_mse_GEN_all +  # 降低MSE权重
+            #         0.2 * loss_mse_GEN_deduction +  # 修复区域MSE权重
+            #         0.2 * loss_ssim_GEN_all +  # 整体SSIM权重
+            #         0.2 * loss_cross_entropy_fake_real_all +  # 整体特征相似度
+            #         0.2 * loss_cross_entropy_fake_target  # 修复区域特征相似度
+            # )
             loss_G = (
-                    0.02 * (loss_input_DIS + loss_target_DIS) / 2 +  # 判别器损失权重降低
-                    0.20 * loss_mse_GEN_all +  # 整体MSE权重增加
-                    0.30 * loss_mse_GEN_deduction +  # 修复区域MSE权重增加
-                    0.25 * loss_ssim_GEN_all +  # 整体SSIM权重
-                    0.15 * loss_cross_entropy_fake_real_all +  # 整体交叉熵特征相似度
-                    0.08 * loss_cross_entropy_fake_target  # 修复区域交叉熵特征相似度
+                    0.10 * (loss_input_DIS + loss_target_DIS) / 2 +  # 增加对抗损失权重
+                    0.05 * loss_mse_GEN_all +  # 降低整体MSE权重
+                    0.05 * loss_mse_GEN_deduction +  # 降低修复区域MSE权重
+                    0.40 * loss_ssim_GEN_all +  # 保持整体SSIM权重
+                    0.20 * loss_cross_entropy_fake_real_all +  # 增加整体特征相似度
+                    0.10 * loss_cross_entropy_fake_target  # 增加修复区域特征相似度
             )
 
             loss_G.backward()
@@ -264,6 +284,7 @@ if __name__ == '__main__':
             loss_DIS_ALL = (fake_loss + real_loss)/2
             loss_DIS_ALL.backward()
             optimizer_D.step()
+
             # 本轮学习结束，学习率衰减
             scheduler_G.step()
             scheduler_D.step()

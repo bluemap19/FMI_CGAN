@@ -7,11 +7,12 @@ from torch import Tensor
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from src_ele.pic_opeeration import show_Pic
-from train_repair_CGAN_model.Dataloader_FMI_add_empty_stripe import dataloader_FMI_logging
+from train_repair_CGAN_model.Dataloader_FMI_add_empty_stripe import dataloader_FMI_logging, dataloader_FMI_logging_no_repeat
 from train_repair_CGAN_model.MODEL_Generator_UNET import GeneratorUNet
+from train_repair_CGAN_model.MODEL_Generator_prompt2 import GeneratorUNetImproved
 
 
-def repair_images_with_model(model_path, input_path, output_path, save_charter='', device='cuda', padding_length=16, len_windows=256, step_windows=10, pic_length_target=128, mask_config={'ratio_empty':0.4, 'num_belt':6, 'rotate_rb':True}):
+def repair_images_with_model(model_path, input_path, output_path, save_charter='', device='cuda', padding_length=16, len_windows=256, step_windows=10, pic_length_target=128, mask_config={'ratio_empty':0.4, 'num_belt':6}):
     """
     使用训练好的图像修复模型修复图像
     参数:
@@ -24,7 +25,8 @@ def repair_images_with_model(model_path, input_path, output_path, save_charter='
     generator = load_generator_model(model_path, device)
 
     # (path=r'0_fmi_dyna.png', padding=16, len_windows=256, step_windows=10, pic_length_target=128, mask_config={'ratio_empty':0.2, 'num_belt':6, 'rotate_rb':True})
-    dataloader_o = dataloader_FMI_logging(input_path, padding=padding_length, len_windows=len_windows, step_windows=step_windows, pic_length_target=pic_length_target, mask_config=mask_config)
+    # dataloader_o = dataloader_FMI_logging(input_path, padding=padding_length, len_windows=len_windows, step_windows=step_windows, pic_length_target=pic_length_target, mask_config=mask_config)
+    dataloader_o = dataloader_FMI_logging_no_repeat(input_path, padding=padding_length, len_windows=len_windows, pic_length_target=pic_length_target, mask_config=mask_config)
     dataloader = DataLoader(dataloader_o, shuffle=False, batch_size=32, drop_last=False, pin_memory=False, num_workers=0)
 
     data_generate_list = []
@@ -74,7 +76,8 @@ def load_generator_model(model_path, device='cuda'):
         GeneratorUNet: 加载的生成器模型
     """
     # 初始化模型
-    generator = GeneratorUNet(in_channels=2, out_channels=1)  # 输入通道为2（图像+掩码），输出通道为1
+    # generator = GeneratorUNet(in_channels=2, out_channels=1)  # 输入通道为2（图像+掩码），输出通道为1
+    generator = GeneratorUNetImproved(in_channels=2, out_channels=1)  # 输入通道为2（图像+掩码），输出通道为1
 
     # 加载模型权重
     if os.path.exists(model_path):
@@ -96,13 +99,14 @@ def load_generator_model(model_path, device='cuda'):
 if __name__ == '__main__':
     # 设置命令行参数
     parser = argparse.ArgumentParser(description='使用训练好的CGAN模型修复图像')
-    parser.add_argument('--model_path', type=str, default=r'D:\GitHub\FMI_CGAN\train_repair_CGAN_model\saved_models\FMI_CGAN_repair\4\model_ele_gen_22800.pth', help='生成器模型路径')
+    parser.add_argument('--model_path', type=str, default=r'D:\GitHub\FMI_CGAN\train_repair_CGAN_model\saved_models\FMI_CGAN_repair\6\model_ele_gen_2800.pth', help='生成器模型路径')
     parser.add_argument('--input_path', type=str, default=r'F:\DeepLData\FMI_SIMULATION\simu_FMI\0_fmi_dyna.png', help='待修复图像目录')
-    parser.add_argument('--output_path', type=str, default=r'F:\DeepLData\pic_repair_paper_effect\temp', help='修复后图像保存目录')
+    # parser.add_argument('--input_path', type=str, default=r'F:\DeepLData\FMI_SIMULATION\simu_cracks\0_background_mask.png', help='待修复图像目录')
+    parser.add_argument('--output_path', type=str, default=r'F:\DeepLData\pic_repair_paper_effect', help='修复后图像保存目录')
     parser.add_argument('--saved_charter', type=str, default=r'', help='修复后图像保存目录')
-    parser.add_argument('--length_windows', type=int, default=256, help='图像尺寸，这个可以随意修改')
+    parser.add_argument('--length_windows', type=int, default=250, help='图像尺寸，这个可以随意修改')
     parser.add_argument('--length_padding', type=int, default=16, help='FMI填充尺寸，用来进行辅助修复，这个可以随意修改')
-    parser.add_argument('--step_windows', type=int, default=20, help='模型窗口遍历时使用的步长大小，这个要小于length_windows')
+    parser.add_argument('--step_windows', type=int, default=10, help='模型窗口遍历时使用的步长大小，这个要小于length_windows')
     parser.add_argument('--length_target', type=int, default=128, help='模型输入数据尺寸，这个不能修改，只能根据模型参数来进行设置')
     parser.add_argument('--ratio_empty', type=float, default=0.4, help='图像的空白率')
     parser.add_argument('--num_belt', type=int, default=6, help='图像空白带条数')
@@ -119,17 +123,21 @@ if __name__ == '__main__':
 
     if args.saved_charter == '':
         args.saved_charter = args.input_path.split('/')[-1].split('\\')[-1].split('.')[0]
+    path_save = args.output_path + '\\' + args.saved_charter
+    if not os.path.exists(path_save):
+        os.mkdir(path_save)
+        print(path_save)
 
     # 运行修复过程
     repair_images_with_model(
         model_path=args.model_path,
         input_path=args.input_path,
-        output_path=args.output_path,
+        output_path=path_save,
         save_charter= args.saved_charter,
         device=args.device,
         padding_length=args.length_padding,
         len_windows=args.length_windows,
         step_windows=args.step_windows,
         pic_length_target=args.length_target,
-        mask_config={'ratio_empty': args.ratio_empty, 'num_belt': args.num_belt, 'rotate_rb': args.rotate_rb},
+        mask_config={'ratio_empty': args.ratio_empty, 'num_belt': args.num_belt},
     )

@@ -3,6 +3,9 @@ from scipy import signal
 import cv2
 import matplotlib.pyplot as plt
 
+from src_ele.dir_operation import search_files_by_criteria
+from src_ele.pic_opeeration import show_Pic
+
 
 def preprocess_inputs(img1, img2, mask=None):
     """
@@ -45,6 +48,8 @@ def preprocess_inputs(img1, img2, mask=None):
     else:
         # 如果没有掩码，创建一个全1的掩码
         mask = np.ones_like(img1[0])[np.newaxis, :, :]
+    if np.max(mask) > 250:
+        mask = mask / 250.0
 
     return img1, img2, mask
 
@@ -71,6 +76,25 @@ def calculate_mse(img1, img2, mask=None):
 
     return mse
 
+def calculate_mae(img1, img2, mask=None):
+    """
+    计算均方误差 (MSE)
+
+    参数:
+        img1 (np.ndarray): 原始图像 (H, W) 或 (H, W, C)
+        img2 (np.ndarray): 修复后图像 (H, W) 或 (H, W, C)
+        mask (np.ndarray): 掩码图像 (H, W) 或 (H, W, C)
+    返回:
+        float: MAE值
+    """
+    # 预处理输入
+    img1, img2, mask = preprocess_inputs(img1, img2, mask)
+
+    # 计算掩码区域的MSE
+    diff = (img1 - img2) * mask
+    mse = np.sum(diff) / np.sum(mask)
+
+    return mse
 
 def calculate_psnr(img1, img2, mask=None):
     """
@@ -178,12 +202,12 @@ def evaluate_repair_quality(original_imgs, repaired_imgs, masks=None):
         dict: 包含MSE, PSNR, SSIM的字典
     """
     results = {}
-    if isinstance(masks, np.ndarray):
-        if np.max(masks) >= 254:
-            masks = masks/255.0
 
     # 计算MSE
     results['mse'] = calculate_mse(original_imgs, repaired_imgs, masks)
+
+    # 计算MAE
+    results['mae'] = calculate_mae(original_imgs, repaired_imgs, masks)
 
     # 计算PSNR
     results['psnr'] = calculate_psnr(original_imgs, repaired_imgs, masks)
@@ -356,17 +380,49 @@ if __name__ == '__main__':
     # # 可视化结果
     # visualize_results(original_color, repaired_color, mask_color, mask_eval_color)
 
-    path_origin = r'F:\DeepLData\pic_repair_paper_effect\temp\0_fmi_dyna_org.png'
-    path_repaired = r'F:\DeepLData\pic_repair_paper_effect\temp\0_fmi_dyna_target_result.png'
-    path_masked = r'F:\DeepLData\pic_repair_paper_effect\temp\0_fmi_dyna_mask.png'
+    # path_origin = r'F:\DeepLData\pic_repair_paper_effect\temp\0_fmi_dyna_org.png'
+    # path_repaired = r'F:\DeepLData\pic_repair_paper_effect\temp\0_fmi_dyna_target_result.png'
+    # path_masked = r'F:\DeepLData\pic_repair_paper_effect\temp\0_fmi_dyna_mask.png'
+    #
+    # image_origin = cv2.imread(path_origin, cv2.IMREAD_GRAYSCALE)
+    # image_repaired = cv2.imread(path_repaired, cv2.IMREAD_GRAYSCALE)
+    # image_mask = 255 - cv2.imread(path_masked, cv2.IMREAD_GRAYSCALE)
+    # # image_mask = None
+    #
+    # print(image_origin.shape, image_repaired.shape)
+    #
+    # results_local = evaluate_repair_quality(image_origin, image_repaired, image_mask)
+    # results_all = evaluate_repair_quality(image_origin, image_repaired)
+    # print(results_local, results_all)
 
-    image_origin = cv2.imread(path_origin, cv2.IMREAD_GRAYSCALE)
-    image_repaired = cv2.imread(path_repaired, cv2.IMREAD_GRAYSCALE)
-    image_mask = 255 - cv2.imread(path_masked, cv2.IMREAD_GRAYSCALE)
-    # image_mask = None
+    # path_data = r'F:\DeepLData\pic_repair_paper_effect\0_background_mask'
+    path_data = r'F:\DeepLData\pic_repair_paper_effect\0_fmi_dyna'
+    path_list_org = search_files_by_criteria(path_data, name_keywords=['_org'], file_extensions=['.png'])
+    path_list_mask = search_files_by_criteria(path_data, name_keywords=['_mask'], file_extensions=['.png'])
+    path_list_result = search_files_by_criteria(path_data, name_keywords=['_model_result'], file_extensions=['.png'])
+    path_list_target_result = search_files_by_criteria(path_data, name_keywords=['_target_result'], file_extensions=['.png'])
 
-    print(image_origin.shape, image_repaired.shape)
+    image_origin = cv2.imread(path_list_org[0], cv2.IMREAD_GRAYSCALE)
+    image_repaired = cv2.imread(path_list_result[0], cv2.IMREAD_GRAYSCALE)
+    image_repaired_target = cv2.imread(path_list_target_result[0], cv2.IMREAD_GRAYSCALE)
+    image_mask = 255 - cv2.imread(path_list_mask[0], cv2.IMREAD_GRAYSCALE)
+    image_input = image_mask/255 * image_origin
 
     results_local = evaluate_repair_quality(image_origin, image_repaired, image_mask)
     results_all = evaluate_repair_quality(image_origin, image_repaired)
     print(results_local, results_all)
+
+    windows_length = 256
+    step = 200
+    NUM_PIC = (image_origin.shape[0] - windows_length)//step + 1
+    for i in range(NUM_PIC):
+        start = i * step
+        end = min(start + windows_length, image_origin.shape[0])
+        img_windows_origin = image_origin[start:end]
+        img_windows_mask = image_mask[start:end]
+        img_input = image_input[start:end]
+
+        img_windows_repaired = image_repaired[start:end]
+        img_windows_target_result = image_repaired_target[start:end]
+
+        show_Pic([img_windows_origin, img_windows_mask, img_input.astype(np.uint8), img_windows_repaired, img_windows_target_result], title='Image repair effect', pic_str=['Origin', 'Mask', 'Model_input', 'Model_output', 'origin+Repair*mask'])

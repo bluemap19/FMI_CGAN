@@ -182,17 +182,6 @@ class GeneratorUNet(nn.Module):
         # 最终输出
         return self.final(u5)
 
-    def perceptual_loss(self, generated, target):
-        """计算感知损失（如果适用）"""
-        if self.vgg is None or generated.shape[1] != 3:
-            return 0
-
-        # 计算VGG特征
-        gen_features = self.vgg(generated)
-        target_features = self.vgg(target)
-
-        # 计算L1损失
-        return F.l1_loss(gen_features, target_features)
 
 
 if __name__ == '__main__':
@@ -209,16 +198,5 @@ if __name__ == '__main__':
     output = gen(v1)
     print(f"输入形状: {v1.shape}, 输出形状: {output.shape}")
 
-    # # 测试感知损失（当输出通道为3时）
-    # gen_rgb = GeneratorUNet(in_channels=6, out_channels=3).to(device)
-    # v2 = torch.randn((5, 3, 256, 256)).to(device)
-    # loss = gen_rgb.perceptual_loss(output, v2)  # 这里仅为演示，实际应使用真实目标
-    # print(f"感知损失: {loss}")
-    #
-    # # 内存占用测试
-    # torch.cuda.empty_cache()
-    # with torch.no_grad():
-    #     large_input = torch.randn((1, 6, 512, 512)).to(device)
-    #     large_output = gen(large_input)
-    #     print(f"大尺寸输入输出测试成功: {large_output.shape}")
+
 
