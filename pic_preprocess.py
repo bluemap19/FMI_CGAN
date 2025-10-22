@@ -628,7 +628,7 @@ def pic_tailor(pic=np.zeros((5, 5)), pic_shape_ex=[224, 224]):
         return pic_new
 
 
-def random_morphology(image, ratio=random.random(), k_size=random.randint(1, 3) * 2 + 1):
+def random_morphology(image, ratio=random.random(), k_size=None):
     """
     对输入图像进行随机的形态学处理（溶蚀、膨胀、开运算、闭运算）
 
@@ -644,8 +644,11 @@ def random_morphology(image, ratio=random.random(), k_size=random.randint(1, 3) 
     if not isinstance(image, np.ndarray):
         raise ValueError("输入必须是numpy数组")
 
+    if k_size is None:
+        k_size = np.random.choice([3, 5, 7])
+
     # 创建形态学核
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (k_size, k_size))
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k_size, k_size))
 
     # 根据随机比例选择形态学操作
     if ratio < 0.25:
@@ -934,7 +937,7 @@ def pic_binary_random(img, kThreshold_shift=1.2, erode=True):
     binary = otsu.apply_thresholds_to_image(kThresholds)
 
     if erode:
-        binary = random_morphology(binary)
+        binary = random_morphology(binary, k_size=3)
 
 
     return binary, img

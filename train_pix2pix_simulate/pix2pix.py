@@ -20,15 +20,15 @@ parser.add_argument("--n_epochs", type=int, default=10, help="number of epochs o
 
 parser.add_argument("--img_size_x", type=int, default=256, help="size of image height")
 parser.add_argument("--img_size_y", type=int, default=256, help="size of image width")
-parser.add_argument("--batch_size", type=int, default=32, help="size of the batches")
+parser.add_argument("--batch_size", type=int, default=64, help="size of the batches")
 parser.add_argument("--n_cpu", type=int, default=6, help="number of cpu threads to use during batch generation")
-parser.add_argument("--dataset_path_val", type=str, default=r"D:\DeepLData\GAN_Fracture_layer", help="path of the valide dataset")
-parser.add_argument("--dataset_path", type=str, default=r"D:\DeepLData\target_stage1_small_big_mix", help="path of the train dataset")
+parser.add_argument("--dataset_path_val", type=str, default=r"F:\DeepLData\target_stage1_small_big_mix\FMI_IMAGE\ZG_FMI_SPLIT", help="path of the valide dataset")
+parser.add_argument("--dataset_path", type=str, default=r"F:\DeepLData\target_stage1_small_big_mix\FMI_IMAGE\ZG_FMI_SPLIT", help="path of the train dataset")
 # # parser.add_argument("--dataset_path", type=str, default=r"/root/autodl-tmp/data/GAN_Fracture_layer", help="path of the train dataset")
 # parser.add_argument("--dataset_path", type=str, default=r"D:\Data\target_stage1_small_big_mix", help="path of the dataset")
 # parser.add_argument("--dataset_path_val", type=str, default=r"D:\Data\GAN_Fracture_layer", help="path of the dataset")
 
-parser.add_argument("--channels_in", type=int, default=8, help="number of image channels")
+parser.add_argument("--channels_in", type=int, default=4, help="number of image channels")
 parser.add_argument("--channels_out", type=int, default=2, help="number of image channels")
 parser.add_argument("--lr", type=float, default=0.0001, help="adam: learning rate")
 parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")
@@ -59,12 +59,9 @@ if __name__ == '__main__':
     cuda = True if torch.cuda.is_available() else False
 
     # Loss functions
-    criterion_MSE = torch.nn.MSELoss()
-    # criterion_ssim = MSSSIM(window_size=27, channel=2)
-    criterion_ssim = GeologicalSSIM(window_size=27, channel=2)
-
-    # Calculate output of image discriminator (PatchGAN)
-    patch = (1, opt.img_size_x // 2 ** 4, opt.img_size_y // 2 ** 4)
+    # criterion_MSE = torch.nn.MSELoss()
+    criterion_MSE = torch.nn.L1Loss()
+    criterion_ssim = GeologicalSSIM(window_size=97, channel=2)
 
     # Initialize generator and discriminator
     generator = GeneratorUNet(in_channels=opt.channels_in, out_channels=opt.channels_out)
@@ -124,7 +121,7 @@ if __name__ == '__main__':
         imgs = imgs.reshape((imgs.shape[0] * imgs.shape[1], 1, imgs.shape[-2], imgs.shape[-1]))
         # print(imgs.shape)
 
-        save_image(imgs, "images/%s/%d.png" % (opt.dataset_name, batches_done), nrow=12, padding=1, normalize=True)
+        save_image(imgs, "images/%s/%d.png" % (opt.dataset_name, batches_done), nrow=8, padding=1, normalize=True)
         model_path = "saved_models/{}/model_{}_{}.pth".format(opt.dataset_name, 'ele_gen', batches_done)
         torch.save(generator.state_dict(), model_path)
         model_path = "saved_models/{}/model_{}_{}.pth".format(opt.dataset_name, 'ele_dis', batches_done)
@@ -178,17 +175,18 @@ if __name__ == '__main__':
             loss_fake_DIS_16 = criterion_MSE(pred_fake[0], valid_16)
             loss_fake_DIS_8 = criterion_MSE(pred_fake[1], valid_8)
             loss_fake_DIS_4 = criterion_MSE(pred_fake[2], valid_4)
-            # print(loss_fake_DIS_16.item(), loss_fake_DIS_8.item(), loss_fake_DIS_4.item())
             loss_fake_DIS = (loss_fake_DIS_16 + 2*loss_fake_DIS_8 + 4*loss_fake_DIS_4) / 7
 
-            # 重建损失
+            # 重建MSE或L1损失
             loss_ssim_GEN = criterion_ssim(fake_gen, real_output)
             loss_mse_GEN = criterion_MSE(fake_gen, real_output)
-            # print(loss_ssim_GEN, loss_mse_GEN, loss_l1_GEN)
+
+            # 交叉熵损失
+            loss_cross_entropy_reconstruct = cosine_similarity_loss(flatten_features(real_output), flatten_features(fake_gen))
 
             # 总损失
-            loss_G = 0.1 * loss_fake_DIS + 0.8 * loss_ssim_GEN + 0.2 * loss_mse_GEN
-            # loss_G = 0.1 * loss_fake_DIS + 0.99 * loss_mse_GEN
+            # loss_G = 0.01 * loss_fake_DIS + 0.7 * loss_ssim_GEN + 0.1 * loss_mse_GEN + 0.2*loss_cross_entropy_reconstruct
+            loss_G = 0.01 * loss_fake_DIS + 0.7 * loss_ssim_GEN + 0.1 * loss_mse_GEN + 0.3*loss_cross_entropy_reconstruct
 
             loss_G.backward()
             optimizer_G.step()
@@ -212,16 +210,15 @@ if __name__ == '__main__':
             loss_fake_DIS_16 = criterion_MSE(pred_fake[0].detach(), fake_16)
             loss_fake_DIS_8 = criterion_MSE(pred_fake[1].detach(), fake_8)
             loss_fake_DIS_4 = criterion_MSE(pred_fake[2].detach(), fake_4)
-            # print(loss_real_DIS_16, loss_real_DIS_8, loss_real_DIS_4, loss_fake_DIS_16, loss_fake_DIS_8, loss_fake_DIS_4)
 
             # 总判别器损失
             loss_DIS_MSE = (loss_real_DIS_16 + 2*loss_real_DIS_8 + 4*loss_real_DIS_4 + loss_fake_DIS_16 + 2*loss_fake_DIS_8 + 4*loss_fake_DIS_4) / 14
 
+            # 交叉熵损失
             loss_cross_entropy_fake_real_16 = cosine_similarity_loss(flatten_features(pred_fake[0]), flatten_features(pred_real[0]))
             loss_cross_entropy_fake_real_8 = cosine_similarity_loss(flatten_features(pred_fake[1]), flatten_features(pred_real[1]))
             loss_cross_entropy_fake_real_4 = cosine_similarity_loss(flatten_features(pred_fake[2]), flatten_features(pred_real[2]))
             loss_DIS_cross_entropy = (loss_cross_entropy_fake_real_16 + 2*loss_cross_entropy_fake_real_8 + 4*loss_cross_entropy_fake_real_4) / 7
-            print(loss_cross_entropy_fake_real_16, loss_cross_entropy_fake_real_8, loss_cross_entropy_fake_real_4)
 
             loss_DIS_ALL = 0.6 * loss_DIS_MSE + 0.4 * loss_DIS_cross_entropy
 
@@ -241,21 +238,16 @@ if __name__ == '__main__':
             time_left = datetime.timedelta(seconds=batches_left * (time.time() - prev_time))
             prev_time = time.time()
 
-            # loss_G = 0.01 * loss_fake_DIS + 0.5 * loss_ssim_GEN + 0.3 * loss_mse_GEN
-            # loss_fake_DIS = loss_fake_DIS_16 + loss_fake_DIS_8 + loss_fake_DIS_4
-            # loss_DIS_MSE = (loss_real_DIS_16 + loss_real_DIS_8 + loss_real_DIS_4 + loss_fake_DIS_16 + loss_fake_DIS_8 + loss_fake_DIS_4) / 6
-            # loss_DIS_cross_entropy = (loss_cross_entropy_fake_real_16 + loss_cross_entropy_fake_real_8 + loss_cross_entropy_fake_real_4) / 3
+            # loss_G = 0.1 * loss_fake_DIS + 0.7 * loss_ssim_GEN + 0.1 * loss_mse_GEN + 0.2 * loss_cross_entropy_reconstruct
+            # loss_DIS_ALL = 0.6 * loss_DIS_MSE + 0.4 * loss_DIS_cross_entropy
             log_train.append([epoch, opt.n_epochs, i, len(dataloader),
-                              loss_fake_DIS_16.item(), loss_fake_DIS_8.item(), loss_fake_DIS_4.item(),
-                              loss_fake_DIS.item(), loss_ssim_GEN.item(), loss_mse_GEN.item(),
-                              loss_real_DIS_16.item(), loss_real_DIS_8.item(), loss_real_DIS_4.item(),
-                              loss_cross_entropy_fake_real_16.item(), loss_cross_entropy_fake_real_8.item(), loss_cross_entropy_fake_real_4.item(),
-                              loss_DIS_MSE.item(), loss_DIS_cross_entropy.item(),
+                              loss_fake_DIS.item(), loss_ssim_GEN.item(), loss_mse_GEN.item(), loss_cross_entropy_reconstruct.item(), loss_G.item(),
+                              loss_DIS_MSE.item(), loss_DIS_cross_entropy.item(), loss_DIS_ALL.item(),
                               optimizer_G.state_dict()['param_groups'][0]['lr'], optimizer_D.state_dict()['param_groups'][0]['lr']])
 
             # Print log
             sys.stdout.write(
-                "\r[Epoch %d/%d] [Batch %d/%d] [G  mse: %f, ssim: %f, all:%f] [D mse: %f, cross entropy:%f, all:%f] [Gen lr:%f, Dis lr:%f] ETA: %s"
+                "\r[Epoch %d/%d] [Batch %d/%d] [G  mse: %f, ssim: %f, cross entropy%f, all:%f] [D mse: %f, cross entropy:%f, all:%f] [Gen lr:%f, Dis lr:%f] ETA: %s"
                 % (
                     epoch,
                     opt.n_epochs,
@@ -263,6 +255,7 @@ if __name__ == '__main__':
                     len(dataloader),
                     loss_mse_GEN.item(),
                     loss_ssim_GEN.item(),
+                    loss_cross_entropy_reconstruct.item(),
                     loss_G.item(),
                     loss_DIS_MSE.item(),
                     loss_DIS_cross_entropy.item(),
@@ -283,6 +276,7 @@ if __name__ == '__main__':
             generator.eval()
             val_mse_losses = []
             val_ssim_losses = []
+            val_cross_entropy_losses = []
             with torch.no_grad():
                 for i, batch in enumerate(dataloader_val):
                     real_input = Variable(batch["B"].type(Tensor))
@@ -291,12 +285,16 @@ if __name__ == '__main__':
                     fake_gen = generator(real_input)
                     loss_mse = criterion_MSE(fake_gen, real_output)
                     loss_ssim = criterion_ssim(fake_gen, real_output)
+                    loss_cross_entropy = cosine_similarity_loss(flatten_features(real_output), flatten_features(fake_gen))
                     val_mse_losses.append(loss_mse.item())
                     val_ssim_losses.append(loss_ssim.item())
+                    val_cross_entropy_losses.append(loss_cross_entropy.item())
 
             avg_mse_loss = sum(val_mse_losses) / len(val_mse_losses)
             avg_ssim_loss = sum(val_ssim_losses) / len(val_ssim_losses)
-            avg_val_loss = 0.4*avg_ssim_loss + 0.3*avg_mse_loss
+            avg_cross_entropy_loss = sum(val_cross_entropy_losses) / len(val_cross_entropy_losses)
+            # avg_val_loss = 0.7*avg_ssim_loss + 0.1*avg_mse_loss + 0.2*avg_cross_entropy_loss
+            avg_val_loss = 0.7*avg_ssim_loss + 0.1*avg_mse_loss + 0.2*avg_cross_entropy_loss
             print(f"\nValidation Loss: {avg_val_loss:.4f}")
 
             # 保存最佳模型
@@ -308,4 +306,4 @@ if __name__ == '__main__':
             generator.train()
 
     np.savetxt('Train_simulate_model_log_{}.txt'.format(epoch), np.array(log_train), delimiter='\t', comments='',newline='\n', fmt='%.4f')
-    np.savetxt('Valide_simulate_model_log_{}.txt'.format(epoch), np.array(log_val), delimiter='\t', comments='',newline='\n', fmt='%.4f')
+    # np.savetxt('Valide_simulate_model_log_{}.txt'.format(epoch), np.array(log_val), delimiter='\t', comments='',newline='\n', fmt='%.4f')

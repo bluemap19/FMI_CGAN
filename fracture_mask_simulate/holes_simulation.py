@@ -3,7 +3,9 @@ import math
 import cv2
 import numpy as np
 import random
-from src_ele.dir_operation import traverseFolder
+
+import pandas as pd
+
 from src_ele.file_operation import get_ele_data_from_path
 from src_ele.pic_opeeration import show_Pic, binary_pic
 from PIL import Image, ImageDraw
@@ -149,9 +151,9 @@ def try_add_hole(pic, time_repetition=30, ratio_repetition=0.02, vugs_shape_conf
         # 生成随机的孔洞结构信息 generate_shapes(基础图形的个数, 图像的长, 图像的宽)
         img_hole = generate_shapes(11, 80, 80)
 
-        vugs_len = np.random.randint(vugs_shape_configuration[0][0], vugs_shape_configuration[0][1]) * 2
-        vugs_high = np.random.randint(vugs_shape_configuration[1][0], vugs_shape_configuration[1][1]) * 2
-        img_hole = cv2.resize(img_hole, (vugs_high, vugs_len))
+        vug_length = np.random.randint(vugs_shape_configuration[0][0], vugs_shape_configuration[0][1]) * 2
+        vug_high = np.random.randint(vugs_shape_configuration[1][0], vugs_shape_configuration[1][1]) * 2
+        img_hole = cv2.resize(img_hole, (vug_high, vug_length))
 
         h, w = img_hole.shape
         max_edge = np.max(np.array([h, w]))
@@ -160,22 +162,23 @@ def try_add_hole(pic, time_repetition=30, ratio_repetition=0.02, vugs_shape_conf
 
         # 定义一个随机的旋转操作，对生成的孔洞结构进行旋转操作
         # 原图像的高、宽、通道数
-        h_r, w_r = img_hole_rotate.shape
+        vug_high, vug_width = img_hole_rotate.shape
         # 旋转参数：旋转中心，旋转角度， scale
-        M = cv2.getRotationMatrix2D((w_r/2, h_r/2), np.random.randint(10, 350), 1)
+        M = cv2.getRotationMatrix2D((vug_width/2, vug_high/2), np.random.randint(10, 350), 1)
         # 参数：原始图像，旋转参数，元素图像宽高
-        img_hole = cv2.warpAffine(img_hole_rotate, M, (w_r, h_r))
+        img_hole = cv2.warpAffine(img_hole_rotate, M, (vug_width, vug_high))
 
         # 生成随机的 孔洞结构 位置
-        x_vugs_location = np.random.randint(5, pic.shape[0] - img_hole.shape[0] - 5)
-        y_vugs_location = np.random.randint(5, pic.shape[1] - img_hole.shape[1] - 5)
+        vug_location_height = np.random.randint(5, pic.shape[0] - img_hole.shape[0] - 5)
+        vug_location_width = np.random.randint(5, pic.shape[1] - img_hole.shape[1] - 5)
 
-        hole_intersection = pic[x_vugs_location:x_vugs_location + img_hole.shape[0], y_vugs_location:y_vugs_location + img_hole.shape[1]] & img_hole
+        hole_intersection = pic[vug_location_height:vug_location_height + img_hole.shape[0], vug_location_width:vug_location_width + img_hole.shape[1]] & img_hole
         s2_intersection = np.sum(hole_intersection)//255
         s2_hole = np.sum(img_hole)//255 + 1
         if (s2_intersection/s2_hole < ratio_repetition):
-            pic[x_vugs_location:x_vugs_location + h_r, y_vugs_location:y_vugs_location + w_r] |= img_hole
-            location_t = [x_vugs_location, y_vugs_location, vugs_len, vugs_high]
+            pic[vug_location_height:vug_location_height + vug_high, vug_location_width:vug_location_width + vug_width] |= img_hole
+            vugs_area = np.sum(img_hole) / 255
+            location_t = {'vug_location_height': vug_location_height, 'vug_location_width': vug_location_width, 'vug_width': vug_width, 'vug_high': vug_high, 'vug_area':vugs_area}
             break
         else:
             # print('holes intersection part is too large:{}'.format(s2_intersection/s2_hole))
@@ -200,6 +203,12 @@ class holes_simulation(object):
         :param vug_num_p: the num of vugs to add
         :return: the result of added vugs pic
         """
+        hole_parameter = np.zeros((pic.shape[0], 4), dtype=np.float64)
+        depth_array = np.linspace(start=0, stop=pic.shape[0]-1, num=pic.shape[0])
+        cols_holes = ['hole_area', 'hole_density', 'hole_area_ratio']
+        df_hole_para = pd.DataFrame(hole_parameter, columns=['depth']+cols_holes)
+        df_hole_para['depth'] = depth_array
+        df_hole_para.astype(np.float64)
 
         # 定义 对图像添加多少随机的孔洞信息
         vugs_num = vug_num_p
@@ -209,12 +218,16 @@ class holes_simulation(object):
             pic, Rotate_Angle = pic_rorate_random(pic, Rotate_Angle=Angle)
             location_info.append(Rotate_Angle)
 
-            pic, location_t = try_add_hole(pic, time_repetition=50, ratio_repetition=ratio_repetition, vugs_shape_configuration=vugs_shape_configuration)
-            location_info.append(location_t)
+            pic, vug_config = try_add_hole(pic, time_repetition=50, ratio_repetition=ratio_repetition, vugs_shape_configuration=vugs_shape_configuration)
+            # {'vug_location_height': vug_location_height, 'vug_location_width': vug_location_width, 'vug_width': vug_width, 'vug_high': vug_high, 'vug_area':vugs_area}
+            location_info.append(vug_config)
 
             pic, _ = pic_rorate_random(pic, -Rotate_Angle)
+            df_hole_para.loc[vug_config['vug_location_height'], ['hole_area']] = vug_config['vug_area']
+            df_hole_para.loc[vug_config['vug_location_height'], ['hole_density']] += 1
+            df_hole_para.loc[vug_config['vug_location_height'], ['hole_area_ratio']] += vug_config['vug_area']/(pic.shape[0]*vug_config['vug_high'])
 
-        return pic, location_info
+        return pic, location_info, df_hole_para
 
     def genrate_new_blocks(self, config_blocks={}):
         # 1. 设置默认参数
@@ -250,7 +263,7 @@ class holes_simulation(object):
         pic_empty = np.zeros((height, width), dtype=np.uint8)
 
         # 6. 根据参数生成新孔洞块状图像
-        pic_blocks, location_info = self.add_vugs_random(pic_empty, vug_num_p=holes_num, ratio_repetition=ratio_repetition, vugs_shape_configuration=vugs_shape_configuration)
+        pic_blocks, location_info, df_hole_para = self.add_vugs_random(pic_empty, vug_num_p=holes_num, ratio_repetition=ratio_repetition, vugs_shape_configuration=vugs_shape_configuration)
         return pic_blocks
 
 if __name__ == '__main__':
@@ -267,8 +280,7 @@ if __name__ == '__main__':
             })
         IMG_LIST.append(block_image)
 
-
-        block_image, location_info = HS.add_vugs_random(block_image, vug_num_p=20, ratio_repetition=0.01, vugs_shape_configuration=[[2, 27], [2, 27]])
+        block_image, location_info, df_hole_para = HS.add_vugs_random(block_image, vug_num_p=20, ratio_repetition=0.01, vugs_shape_configuration=[[2, 27], [2, 27]])
         IMG_LIST.append(block_image)
 
     show_Pic(IMG_LIST, pic_order='36', figure=(20, 10))

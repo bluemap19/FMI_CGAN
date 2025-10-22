@@ -2,8 +2,10 @@ import random
 from distutils.command.config import config
 import cv2
 import numpy as np
+import pandas as pd
 from scipy.signal import savgol_filter
 from src_ele.pic_opeeration import show_Pic
+from src_plot.plot_logging import visualize_well_logs
 
 
 # 裂缝的随机断裂
@@ -88,11 +90,12 @@ def generate_single_period_sine_crack(config):
     noise_level: 噪声强度 (0-1)
     smooth_sigma: 平滑系数
     crack_width: 裂缝宽度 (像素)
+    crack_break_ratio: 裂缝产生随机break（裂缝中间断裂）的概率
 
     返回:
     裂缝掩码图像 (二值或灰度)
     """
-    width, height, crack_x_shift, noise_level, crack_width, crack_break_ratio = config['width'], config['height'], config['crack_x_shift'], config['noise_level'], config['crack_width'], config['crack_break_ratio']
+    width, height, crack_x_shift, noise_level, crack_width, crack_break_ratio = config['width_background'], config['height_background'], config['crack_x_shift'], config['noise_level'], config['crack_width'], config['crack_break_ratio']
     # 1. 创建空白图像
     img = np.zeros((height, width), dtype=np.uint8)
     # crack_height: 裂缝中心线高度
@@ -167,6 +170,18 @@ def generate_single_period_sine_crack(config):
     return img_final
 
 
+def get_pic_top_and_bottle_index(IMG):
+    # 多缝的截图程序，把上下部分，没什么用的黑色背景板截图丢掉
+    SUM_front = []
+    SUN_behind = []
+    for i in range(IMG.shape[0]):
+        SUM_front.append(np.sum(IMG[:i + 1, :]))
+        SUN_behind.append(np.sum(IMG[i:, :]))
+    # 计算截图使用的最大最小值，即截图使用的图像上下限index
+    index_start = np.max(np.where(np.array(SUM_front) <= 1))
+    index_end = np.min(np.where(np.array(SUN_behind) <= 1))
+
+    return index_start, index_end
 
 
 class cracks_simulation(object):
@@ -178,7 +193,7 @@ class cracks_simulation(object):
     # 新生成一个裂缝图像，并返回
     def genrate_new_crack(self, config_crack={}):
         """
-        生成新的裂缝图像
+        生成新的裂缝图像，函数测试用的，后面基本没啥用
         参数:
         config_crack: 配置字典，包含以下可选参数:
             - width: 图像宽度
@@ -192,8 +207,8 @@ class cracks_simulation(object):
         """
         # 1. 设置默认参数
         default_config = {
-            'width': 256,
-            'height': 256,
+            'width_background': 256,
+            'height_background': 256,
             'crack_x_shift': 0.0,
             'noise_level': 0.05,
             'crack_width': 20,
@@ -203,9 +218,9 @@ class cracks_simulation(object):
         config_crack = {**default_config, **config_crack}
 
         # 3. 验证参数
-        if not isinstance(config_crack['width'], int) or config_crack['width'] <= 0:
+        if not isinstance(config_crack['width_background'], int) or config_crack['width_background'] <= 0:
             raise ValueError("width必须是正整数")
-        if not isinstance(config_crack['height'], int) or config_crack['height'] <= 0:
+        if not isinstance(config_crack['height_background'], int) or config_crack['height_background'] <= 0:
             raise ValueError("height必须是正整数")
         if not 0.0 <= config_crack['noise_level'] <= 1.0:
             raise ValueError("noise_level必须在[0.0, 1.0]范围内")
@@ -217,12 +232,12 @@ class cracks_simulation(object):
 
         return fracture_t
 
-    # 产生随机的单条裂缝图像，当然也可以通过配置参数控制器中某些变量
+    # 产生随机的单条裂缝图像，当然也可以通过配置参数控制器中某些变量，并返回裂缝模拟配置参数以及裂缝的参数曲线
     def genrate_random_single_crack(self, config_crack={}):
         # 1. 设置随机参数
         default_config = {
-            'width': 256,
-            'height': 256,
+            'width_background': 256,
+            'height_background': 256,
             'crack_x_shift': random.random(),
             'crack_width': random.randint(20, 50),
             'crack_break_ratio':0.6,
@@ -234,10 +249,41 @@ class cracks_simulation(object):
         # 3. 根据参数，生成新的裂缝
         fracture_t = generate_single_period_sine_crack(config_crack)
 
-        return fracture_t
+        # 4. 根据生成的裂缝，生产一打响应的裂缝参数曲线，其中的深度列换位像素index信息
+        depth = np.arange(0, fracture_t.shape[0])
+        # 创建测井曲线数据，并进行合适的初始化
+        crack_length = np.zeros(len(depth), dtype=np.float32)
+        crack_width = np.zeros(len(depth), dtype=np.float32)
+        crack_width += config_crack['crack_width']
+        crack_area = np.zeros(len(depth), dtype=np.float32)
+        crack_angle = np.zeros(len(depth), dtype=np.float32)
+        crack_angle[len(depth)//2] = config_crack['crack_break_ratio']
+        crack_inclination = np.zeros(len(depth), dtype=np.float32)
+        crack_inclination[len(depth)//2] = config_crack['height_background']
+        crack_density = np.ones(len(depth), dtype=np.float32)
+        for i in range(0, len(depth)):
+            crack_area[i] = np.sum(fracture_t[i, :])/255
+            crack_length[i] = crack_area[i]/crack_width[i]
+        dp_crack_para = pd.DataFrame({
+            'depth': depth,
+            'crack_length': crack_length,
+            'crack_width': crack_width,
+            'crack_area': crack_area,
+            'crack_angle': crack_angle,
+            'crack_inclination': crack_inclination,
+            'crack_density': crack_density
+        })
+        # # 设置深度列为索引
+        # dp_crack_para.set_index('depth', inplace=False)
+        return fracture_t, config_crack, dp_crack_para
 
-    # 在给定的图像上，给定指定的裂缝参数，新增一个裂缝
+    # 在给定的图像上，给定指定的裂缝参数，新增多个裂缝
     def add_cracks_on_pic(self, IMG=np.zeros((4, 4), dtype=np.uint8), list_configs=[], show_process=False):
+        """
+        给定一张地层图片IMG，以及默认配置列表list_configs，进行裂缝mask模拟，
+        返回的是模拟后的裂缝地层图像mask以及裂缝对应的地层参数曲线
+        """
+
         # 图像必须是array-2D格式的
         if not isinstance(IMG, np.ndarray):
             print('IMG is not np.ndarray')
@@ -259,6 +305,26 @@ class cracks_simulation(object):
             # height_draw 参数用来进行多缝模拟时， 控制每单缝Y方向的像素个数
             # crack_start_height 参数用来进行多缝模拟时， 控制单缝在Y方向 开始像素起始位置 （从上往下数）
 
+        # 4. 根据生成的裂缝，生产一打相应的裂缝参数曲线
+        depth = np.arange(0, IMG.shape[0])
+        # 创建测井曲线数据，并进行合适的初始化
+        crack_length = np.zeros(len(depth), dtype=np.float64)
+        crack_width = np.zeros(len(depth), dtype=np.float64)
+        crack_area = np.zeros(len(depth), dtype=np.float64)
+        crack_angle = np.zeros(len(depth), dtype=np.float64)
+        crack_inclination = np.zeros(len(depth), dtype=np.float64)
+        crack_density = np.zeros(len(depth), dtype=np.float64)
+        df_cracks_para = pd.DataFrame({
+            'depth': depth,
+            'crack_length': crack_length,
+            'crack_width': crack_width,
+            'crack_area': crack_area,
+            'crack_angle': crack_angle,
+            'crack_inclination': crack_inclination,
+            'crack_density': crack_density
+        }).astype(np.float64)
+        list_paras = ['crack_length', 'crack_width', 'crack_area', 'crack_angle', 'crack_inclination', 'crack_density']
+
         for config in list_configs:
             if show_process:
                 IMG_DRAW_RAW = IMG.copy()
@@ -270,63 +336,80 @@ class cracks_simulation(object):
             if height_draw + crack_start_height > IMG.shape[0]:
                 print(f'error as : height_draw ({height_draw}) + crack_start_height ({crack_start_height}) > IMG.shape[0] ({IMG.shape[0]})')
                 exit(0)
-            fracture_t = self.genrate_random_single_crack(config)
+            fracture_t, fracture_config, fracture_parameter = self.genrate_random_single_crack(config)
             fracture_t_reshape = cv2.resize(fracture_t, [IMG.shape[1], height_draw], interpolation=cv2.INTER_CUBIC)
+            # visualize_well_logs(
+            #     data=fracture_parameter,
+            #     depth_col='depth',
+            #     curve_cols=list_paras,
+            # )
+            fracture_config, fracture_parameter = self.adjust_crack_para_by_target_window_height(fracture_config, fracture_parameter, fracture_t_reshape.shape)
 
+            # 裂缝图像信息，合并到背景图像上
             IMG[crack_start_height:height_draw + crack_start_height, :] += fracture_t_reshape
+            # 裂缝参数dataframe的合并，将裂缝的参数进行累加合并到地层总的裂缝参数曲线上
+            df_cracks_para.loc[crack_start_height:height_draw+crack_start_height-1, list_paras] += fracture_parameter[list_paras].values
+            # visualize_well_logs(
+            #     data=df_cracks_para,
+            #     depth_col='depth',
+            #     curve_cols=list_paras,
+            # )
+
             if show_process:
                 show_Pic([IMG_DRAW_RAW, IMG], pic_order='12', figure=(8, 4))
+        return IMG, df_cracks_para
 
-        return IMG
-
-    # 可视化不同参数的单缝效果
+    # 可视化不同参数的单缝效果，测试用的，后续基本没啥用
     def visulize_random_fracture(self):
         f1 = self.genrate_new_crack()
         f2 = self.genrate_new_crack(config_crack={'crack_x_shift': 0.3})
         f3 = self.genrate_new_crack(config_crack={'noise_level': 0.1})
         f4 = self.genrate_new_crack(config_crack={'crack_width': 40, 'noise_level':0.15})
 
-        f5 = self.genrate_random_single_crack(config_crack={'crack_x_shift':0.5})
-        f6 = self.genrate_random_single_crack(config_crack={'crack_x_shift':0.5})
+        f5, cf5, cp5 = self.genrate_random_single_crack(config_crack={'crack_x_shift':0.5})
+        f6, cf6, cp6 = self.genrate_random_single_crack(config_crack={'crack_x_shift':0.5})
 
         show_Pic([f1, f2, f3, f4, f5, f6], pic_order='23', pic_str=[], path_save='', title='', figure=(12, 9), show=True)
 
     def generate_random_multi_cracks(self, config_multi_fractures={}):
+        """
+        根据配置信息config_multi_fractures，产生多缝地层，这个裂缝地层可能是平行缝，也可能是交叉缝
+        这个的主要作用是进行配置，即给一些残缺的配置config，他将汇出完整且合适的配置config，并进行mask的模拟生成
+        然后返回的是裂缝 地层图像IMG, 裂缝默认模拟配置config_multi_fractures, 裂缝参数曲线df_cracks_para
+        """
         config_multi_fractures_default = {
+            'height_background': 512,
+            'width_background': 256,
             'crack_x_shift': 0.6,
             'crack_start_height': 100,
-            'height_background':512,
-            'width_background':256,
-            'cracks_num':random.randint(2,3),
-            'rotate_y':random.choice([True, False]),
-            'parallel_fractures':random.choice([True, False])
+            'cracks_num': random.randint(2, 3),
+            'parallel_cracks': random.choice([True, False, False]),
+            'crack_width': random.randint(60, 90),                  # 只是为了配置参数的统一，但是没什么实际用处，起不到什么作用
         }
 
+        # 多缝模拟的参数曲线初始化
         config_multi_fractures = {**config_multi_fractures_default, **config_multi_fractures}
-
         height_background = config_multi_fractures['height_background']             # 背景高度
         width_background = config_multi_fractures['width_background']               # 背景宽度
         crack_x_shift = config_multi_fractures['crack_x_shift']                     # x方向偏移
         crack_start_height = config_multi_fractures['crack_start_height']           # y方向，从哪个像素点开始绘制裂缝图像（一般都是从上到下）
         NUM_Fractures_per_img = config_multi_fractures['cracks_num']                # 多缝中的，裂缝条数
-        rotate_y = config_multi_fractures['rotate_y']                               # 是否在结束生成后翻转Y轴？
-        parallel_fractures = config_multi_fractures['parallel_fractures']           # 是否生成平行的多缝
-
+        parallel_cracks = config_multi_fractures['parallel_cracks']                 # 是否生成平行的多缝
+        crack_width = config_multi_fractures['crack_width']                         # 裂缝宽度配置参数
         IMG_background = np.zeros((height_background, width_background), dtype=np.uint8)
         list_configs = []
 
-        if parallel_fractures:
+        if parallel_cracks:
             print('生成随机平行多缝地层')
         else:
             print('生成随机交叉多缝地层')
 
         # 裂缝配置信息的随机生成
         for i in range(NUM_Fractures_per_img):
-            if parallel_fractures:
+            if parallel_cracks:
                 # 平行多缝的随机参数设置
                 height_draw_t = random.randint(70, 90)
                 crack_width_t = random.randint(60, height_draw_t-5)
-                # noise_level_t = 0.1 + 0.03 * random.randint(1, 2) * (i + 1)
                 noise_level_t = (crack_width_t / 300 + 32 / height_draw_t) * 0.5
                 crack_x_shift_t = crack_x_shift * (0.9 + 0.2 * random.random())
                 crack_start_height_t = crack_start_height + random.randint(70, 80) * i
@@ -354,7 +437,7 @@ class cracks_simulation(object):
                     if parallel_fracture_flag:
                         print('生成随机水平第三缝！！！！！！！！')
                         height_draw_t = int(random.randint(26, 46) * (0.8 + random.random() * 0.4))
-                        crack_width_t = random.randint(180, 210)
+                        crack_width_t = random.randint(160, 190)
                         noise_level_t = (crack_width_t/300 + 96/height_draw_t)*0.5
                         crack_x_shift_t = crack_x_shift * (0.9+0.2*random.random())
                         crack_start_height_t = crack_start_height + random.randint(10, 20) - 8
@@ -373,21 +456,85 @@ class cracks_simulation(object):
                                     'crack_start_height': crack_start_height_t}
                         list_configs.append(config_t)
 
-        IMG = self.add_cracks_on_pic(IMG=IMG_background, list_configs=list_configs, show_process=False)
+        IMG, df_cracks_para = self.add_cracks_on_pic(IMG=IMG_background, list_configs=list_configs, show_process=False)
         # 二值化，将所有裂缝区域进行 最大值化
         _, IMG = cv2.threshold(IMG, 5, 255, cv2.THRESH_BINARY)     # cv2.THRESH_BINARY：当像素值大于阈值时，赋予最大值；否则为0。
 
-        # 多缝的截图程序，把上下部分，没什么用的黑色背景板截图丢掉
-        SUM_front = []
-        SUN_behind = []
-        for i in range(IMG.shape[0]):
-            SUM_front.append(np.sum(IMG[:i+1, :]))
-            SUN_behind.append(np.sum(IMG[i:, :]))
-        index_start = np.max(np.where(np.array(SUM_front) <= 1))
-        index_end = np.min(np.where(np.array(SUN_behind) <= 1))
-        # print(index_start, index_end)
+        index_start, index_end = get_pic_top_and_bottle_index(IMG)
+        return IMG[index_start:index_end, :], config_multi_fractures, df_cracks_para.iloc[index_start:index_end, :]
 
-        return IMG[index_start:index_end, :]
+    def adjust_crack_para_by_target_window_height(self, fracture_config, fracture_parameter, shape_target):
+        """
+        根据新的窗长，调整裂缝配置参数fracture_config以及裂缝相应参数fracture_parameter
+        调整裂缝参数响应，用来进行单挑裂缝参数的合并，组成多缝裂缝参数
+        """
+        # 根据shape_target重新调整fracture_config={'width_background': 256, 'height_background': 512, 'crack_x_shift': 0.70, 'crack_width': 27, 'crack_break_ratio': 0.6, 'noise_level': 0.135}
+        # 计算裂缝深度（裂缝跨度或裂缝的高）缩放因子
+        scale_ratio_config = shape_target[0]/fracture_config['height_background']
+        fracture_config['height_background'] = shape_target[0]                                          # 调整裂缝高度，裂缝在图板上的展开高度
+        fracture_config['crack_width'] = fracture_config['crack_width'] * scale_ratio_config       # 调整裂缝张开度，也就是裂缝的宽
+        # print(f'{fracture_config}', scale_ratio)
+
+        scale_ratio_para = shape_target[0]/fracture_parameter.shape[0]
+        # depth_temp = np.linspace(start=0, stop=shape_target[0]-1, num=shape_target[0])
+        # data_temp = np.zeros((shape_target[0], fracture_parameter.shape[1]))
+        # fracture_parameter_n = pd.DataFrame(data_temp, columns=fracture_parameter.columns)
+        # fracture_parameter_n['depth'] = depth_temp
+
+        # 根据shape_target重新调整 fracture_parameter=pd.Dataframe(Index(['depth', 'crack_length', 'crack_width', 'crack_area', 'crack_angle', 'crack_inclination', 'crack_density'])
+        fracture_parameter_n = self.resample_logging_data(fracture_parameter, new_size=shape_target[0])
+        fracture_parameter_n['crack_area'] = fracture_parameter_n['crack_area']*scale_ratio_para         # 调整裂缝面积曲线
+        fracture_parameter_n['crack_width'] = fracture_parameter_n['crack_width']*scale_ratio_para       # 调整裂缝宽度曲线
+        fracture_parameter_n['crack_angle'] = 0.0
+        fracture_parameter_n['crack_inclination'] = 0.0
+        col_idx_angle_n = fracture_parameter_n.columns.get_loc('crack_angle')
+        col_idx_inclination_n = fracture_parameter_n.columns.get_loc('crack_inclination')
+        col_idx_angle = fracture_parameter.columns.get_loc('crack_angle')
+        col_idx_inclination = fracture_parameter.columns.get_loc('crack_inclination')
+        cols_cracks = ['crack_length', 'crack_width', 'crack_area', 'crack_angle', 'crack_inclination', 'crack_density']
+        for i in range(fracture_parameter.shape[0]):
+            if fracture_parameter.iloc[i, col_idx_angle] > 0:
+                fracture_parameter_n.iloc[int(i*scale_ratio_para), col_idx_angle_n] = fracture_parameter.iloc[i, col_idx_angle]               # 调整裂缝角度曲线
+            if fracture_parameter.iloc[i, col_idx_inclination] > 0:
+                fracture_parameter_n.iloc[int(i*scale_ratio_para), col_idx_inclination_n] = fracture_parameter.iloc[i, col_idx_inclination]   # 调整裂缝角度曲线
+            # fracture_parameter_n.loc[int(i*scale_ratio_para), cols_cracks] = fracture_parameter.loc[i, cols_cracks]
+        fracture_parameter_n = fracture_parameter_n.astype(np.float64)                                          # 调整曲线的数值类型
+        return fracture_config, fracture_parameter_n
+
+    def resample_logging_data(self, df, new_size=512):
+        """
+        dataframe数据的重采样
+        数据新的长度为new_size
+        默认深度列为depth，且默认深度从0开始，且深度的分辨率为1
+        """
+        # 1. 获取所有非depth列
+        non_depth_cols = [col for col in df.columns if col != 'depth']
+        # 2. 创建新的索引序列（0到new_size-1）
+        new_index = np.linspace(0, len(df) - 1, new_size)
+
+        # 3. 对每条非depth曲线进行重采样
+        resampled_data = {}
+        for col in non_depth_cols:
+            # 获取原始值
+            original_values = df[col].values
+
+            # 使用线性插值
+            resampled_values = np.interp(new_index, np.arange(len(original_values)), original_values)
+            resampled_data[col] = resampled_values
+
+        # 4. 创建新的DataFrame
+        resampled_df = pd.DataFrame(resampled_data)
+
+        # 5. 添加depth列并初始化为0
+        resampled_df['depth'] = np.linspace(0, new_size-1, new_size)
+
+        # 6. 确保depth列是第一列
+        columns = ['depth'] + non_depth_cols
+        resampled_df = resampled_df[columns]
+
+        return resampled_df
+
+
 
 if __name__ == '__main__':
     SFS = cracks_simulation()
@@ -399,13 +546,28 @@ if __name__ == '__main__':
     # show_Pic([IMG], pic_order='11')
 
     LIST_IMG_MULTI = []
-    for i in range(9):
-        IMG_T = SFS.generate_random_multi_cracks(config_multi_fractures={'crack_x_shift': 0.1 * i})
+    for i in range(4):
+        IMG_T, config_cracks, df_cracks_para = SFS.generate_random_multi_cracks(config_multi_fractures={'crack_x_shift': 0.1 * i})
         LIST_IMG_MULTI.append(IMG_T)
-    show_Pic(LIST_IMG_MULTI, pic_order='33', figure=(9, 16))
+        print(IMG_T.shape, df_cracks_para.shape)
+        visualize_well_logs(
+            data=df_cracks_para,
+            depth_col='depth',
+            curve_cols=['crack_length', 'crack_width', 'crack_area', 'crack_angle', 'crack_inclination', 'crack_density'],
+        )
+    show_Pic(LIST_IMG_MULTI, figure=(9, 16))
 
-    LIST_IMG_SINGLE = []
-    for i in range(9):
-        IMG_T = SFS.genrate_random_single_crack(config_crack={'crack_x_shift':0.1*i})
-        LIST_IMG_SINGLE.append(IMG_T)
-    show_Pic(LIST_IMG_SINGLE, pic_order='33', figure=(9, 9))
+    # LIST_IMG_SINGLE = []
+    # for i in range(9):
+    #     IMG_T, CF_T, CP_T = SFS.genrate_random_single_crack(config_crack={'crack_x_shift':0.1*i})
+    #     LIST_IMG_SINGLE.append(IMG_T)
+    #     print(CF_T, IMG_T.shape, CP_T.columns)
+    #
+    #     visualize_well_logs(
+    #         data=CP_T,
+    #         depth_col='depth',
+    #         curve_cols=['crack_length', 'crack_width', 'crack_area', 'crack_angle', 'crack_inclination'],
+    #         type_cols=[],
+    #         legend_dict={0: 'Type0', 1: 'Type1', 2: 'Type2', 3: 'Type3'}
+    #     )
+    # show_Pic(LIST_IMG_SINGLE, pic_order='33', figure=(9, 9))

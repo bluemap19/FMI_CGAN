@@ -16,7 +16,6 @@ from src_ele.pic_opeeration import show_Pic
 from use_gan_model_create_fmi.dataloader_use_gan_model import ImageDataset_FMI_SIMULATE_LAYER
 
 
-
 def correct_image_with_rxo(img_ele, rxo, normalize_rxo=False):
     """
     使用rxo曲线校正图像
@@ -104,7 +103,7 @@ if __name__ == '__main__':
     # parser.add_argument("--dataset_path", type=str, default=r"F:\FMI_SIMULATION\simu_cracks\9_background_mask.png",
     parser.add_argument("--dataset_path", type=str, default=r"F:\DeepLData\FMI_SIMULATION\simu_cracks_2\9_background_mask.png",
                         help="path of the dataset")
-    parser.add_argument("--style_path", type=str, default=r'D:\DeepLData\target_stage1_small_big_mix\guan17-11_194_3677.0025_3678.2525_dyna.png',
+    parser.add_argument("--style_path", type=str, default=r'F:\DeepLData\target_stage1_small_big_mix\FMI_IMAGE\ZG_FMI_SPLIT\guan17-11_10_3585.0025_3586.2525_dyna.png',
                         help="path of the dataset")
     parser.add_argument("--netG", type=str, default=r'D:\GitHub\FMI_GAN_Create\train_pix2pix_simulate\SSIM80%\best_generator.pth', help="netG path to load")
     parser.add_argument("--netD", type=str, default='', help="netD path to load")
@@ -199,17 +198,18 @@ if __name__ == '__main__':
     img_stat_gan_full = img_stat_gan_full * 255
     img_dyna_gan_full = dynamic_enhancement(img_stat_gan_full.astype(np.uint8), windows=200, step=1)
 
-    # show_Pic([
-    #           img_dyna_gan_full[100:300, :], img_stat_gan_full[100:300, :],
-    #           img_dyna_gan_full[400:500, :], img_stat_gan_full[400:500, :],
-    #           img_dyna_gan_full[-300:-100, :], img_stat_gan_full[-300:-100, :],
-    #           img_dyna_gan_full[-900:-600, :], img_stat_gan_full[-900:-700, :], ], pic_order='42', figure=(4, 8))
+    show_Pic([
+              img_dyna_gan_full[100:300, :], img_stat_gan_full[100:300, :],
+              img_dyna_gan_full[400:500, :], img_stat_gan_full[400:500, :],
+              img_dyna_gan_full[-300:-100, :], img_stat_gan_full[-300:-100, :],
+              img_dyna_gan_full[-900:-600, :], img_stat_gan_full[-900:-700, :], ], pic_order='42', figure=(4, 8))
 
     path_o = opt.dataset_path.replace('simu_cracks', 'simu_FMI')
-    cv2.imwrite(path_o.replace('background_mask.png', 'fmi_dyna.png'), (img_dyna_gan_full).astype(np.uint8))
-    cv2.imwrite(path_o.replace('background_mask.png', 'fmi_stat.png'), (img_stat_gan_full).astype(np.uint8))
-    np.savetxt(path_o.replace('background_mask.png', 'fmi_dyna.txt'), (img_dyna_gan_full).astype(np.uint8), comments='', delimiter='\t', fmt='%d',
+    print(path_o)
+    cv2.imwrite(path_o.replace('background_mask', 'fmi_dyna'), (img_dyna_gan_full).astype(np.uint8))
+    cv2.imwrite(path_o.replace('background_mask', 'fmi_stat'), (img_stat_gan_full).astype(np.uint8))
+    np.savetxt(path_o.replace('.png', '_dyna.txt'), (img_dyna_gan_full).astype(np.uint8), comments='', delimiter='\t', fmt='%d',
                header='simu_1\n100\n104\nIMAGE.DYNA_SIMU\n\n\n\n')
-    np.savetxt(path_o.replace('background_mask.png', 'fmi_stat.txt'), (img_stat_gan_full).astype(np.uint8), comments='', delimiter='\t', fmt='%d',
+    np.savetxt(path_o.replace('.png', '_stat.txt'), (img_stat_gan_full).astype(np.uint8), comments='', delimiter='\t', fmt='%d',
                header='simu_1\n100\n104\nIMAGE.STAT_SIMU\n\n\n\n')
 
