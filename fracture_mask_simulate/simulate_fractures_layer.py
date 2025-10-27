@@ -56,8 +56,13 @@ def df_background_para_adjust_final(df, window_length=5):
 
     # 5. 处理每个窗口
     for start_idx in window_indices:
-        end_idx = min(start_idx + window_length, n)
-        window_df = df.iloc[start_idx:end_idx]
+        end_idx = min(start_idx + window_length//2, n)
+        start_idx_read = max(start_idx-window_length//2, 0)
+        # 正常窗口内的孔洞缝参数数据
+        window_df = df.iloc[start_idx_read:end_idx]
+        # 小窗口内的孔洞缝参数数据，这个主要用来计算 crack_density 以及 crack_width_adjusted、crack_width 参数的
+        length_windows = window_df.shape[0]//4
+        window_df_small = df.iloc[start_idx_read+length_windows:end_idx-length_windows]
 
         # 5.1 累加列
         crack_length_sum = window_df['crack_length'].sum() * 0.00515
@@ -65,22 +70,28 @@ def df_background_para_adjust_final(df, window_length=5):
         hole_area_sum = window_df['hole_area'].sum() * 0.00515 * 0.0025
         hole_density_sum = window_df['hole_density'].sum()
         hole_area_ratio_sum = window_df['hole_area_ratio'].sum()
-        crack_width_sum = window_df['crack_width_adjusted'].sum() * 0.0025
+        crack_density = window_df_small['crack_density'].max()
 
-        # 5.2 直接复制列（不做修改）
-        depth = window_df['depth'].iloc[0] if len(window_df) > 0 else 0
-        crack_angle = window_df['crack_angle'].iloc[0] if len(window_df) > 0 else 0
-        crack_inclination = window_df['crack_inclination'].iloc[0] if len(window_df) > 0 else 0
-        crack_density = window_df['crack_density'].iloc[0] if len(window_df) > 0 else 0
+        # 5.2 计算 crack_width_sum（所有不为零行的均值）
+        # 获取 crack_width_adjusted 列中不为零的值
+        non_zero_values = window_df_small['crack_width_adjusted'][window_df_small['crack_width_adjusted'] != 0]
+        # 计算非零值 的 平均值
+        if len(non_zero_values) > 0:
+            crack_width_mean = non_zero_values.mean() * 0.0025
+        else:
+            crack_width_mean = 0
 
-        # cols_cracks = ['crack_length', 'crack_width', 'crack_area', 'crack_angle', 'crack_inclination', 'crack_density']
-        # cols_holes = ['hole_area', 'hole_density', 'hole_area_ratio']
+        index = window_df.shape[0]//2
+        depth = df['depth'].iloc[start_idx] if len(window_df) > 0 else 0
+        crack_angle = window_df['crack_angle'].iloc[index] if len(window_df) > 0 else 0
+        crack_inclination = window_df['crack_inclination'].iloc[index] if len(window_df) > 0 else 0
+        # crack_density = window_df['crack_density'].iloc[index] if len(window_df) > 0 else 0
 
         # 5.3 添加到结果
         result_data.append({
             'depth': depth,
             'crack_length': crack_length_sum,
-            'crack_width': crack_width_sum,
+            'crack_width': crack_width_mean,
             'crack_area': crack_area_sum,
             'crack_angle': crack_angle,
             'crack_inclination': crack_inclination,
@@ -98,10 +109,8 @@ def df_background_para_adjust_final(df, window_length=5):
 def add_depth_column(image_FMI):
     """
     为电成像图像数组添加索引列
-
     参数:
     stat_image: 原始图像数组 (10000×256)
-
     返回:
     添加索引列后的新数组 (10000×257)
     """
@@ -110,21 +119,20 @@ def add_depth_column(image_FMI):
         raise TypeError("输入必须是numpy数组")
 
     # 2. 创建深度列 (0-9999的等差数列)
-    depth_column = np.arange(0, image_FMI.shape[0]).reshape(-1, 1)
+    depth_column = np.arange(0, image_FMI.shape[0], dtype=np.float32).reshape(-1, 1)
 
     # 3. 将索引列添加到原始数组的第一列
     # 使用np.hstack水平拼接
     # result = np.hstack((depth_column, stat_image))
 
     # 或者使用np.c_更简洁
-    result = np.c_[depth_column, image_FMI]
+    result = np.c_[depth_column, image_FMI.astype(np.float32)]
 
     return result
 
 
 if __name__ == '__main__':
     CS = cracks_simulation()
-
     # # 背景初始化
     # BASE_BACKGROUND = np.zeros((512, 256), dtype=np.uint8)
     # LIST_IMG_MULTI = []
@@ -157,7 +165,7 @@ if __name__ == '__main__':
     # show_Pic(IMG_LIST, pic_order='36', figure=(20, 10))
 
     for i in range(20):
-        IMG_BACKGROUND_CRACKS = np.zeros((100000, 256), dtype=np.uint8)
+        IMG_BACKGROUND_CRACKS = np.zeros((5000, 256), dtype=np.uint8)
 
         # 存放9个孔洞缝参数，分别是 裂缝密度、裂缝张开度、裂缝长度、裂缝有效面积、面孔率、孔洞密度、孔洞面积
         # 'crack_length', 'crack_width', 'crack_area', 'crack_angle', 'crack_inclination', 'crack_density', 'hole_area', 'hole_density', 'hole_area_ratio'
@@ -174,7 +182,8 @@ if __name__ == '__main__':
         min_crack_height = 50
         max_crack_height = 500
         crack_x_shift = random.random()
-        file_path_save = r'F:\DeepLData\FMI_SIMULATION\simu_cracks_2'           # 必须全英文
+        # file_path_save = r'F:\DeepLData\FMI_SIMULATION\simu_cracks_2'           # 必须全英文
+        file_path_save = r'F:\DeepLData\FMI_SIMULATION\simu_cracks'           # 必须全英文
 
         while (end_index < IMG_BACKGROUND_CRACKS.shape[0] - min_crack_height):
             mode_random = random.random()
@@ -209,37 +218,36 @@ if __name__ == '__main__':
 
         index_save = i
 
-        # 裂缝mask保存
-        name_cracks = str(index_save)+'_cracks_mask'
-        cv2.imwrite(file_path_save +'\\' + name_cracks +'.png', IMG_BACKGROUND_CRACKS)
-        IMG_BACKGROUND_depthed = add_depth_column(IMG_BACKGROUND_CRACKS)
-        np.savetxt(file_path_save+'\\'+name_cracks+'.txt', IMG_BACKGROUND_depthed, fmt='%.2f', header=f'{name_cracks}\n\n', comments='', delimiter='    ')
+        ####### 裂缝mask保存
+        # name_cracks = str(index_save)+'_cracks_mask'
+        # cv2.imwrite(file_path_save +'\\' + name_cracks +'.png', IMG_BACKGROUND_CRACKS)
+        # IMG_BACKGROUND_depthed = add_depth_column(IMG_BACKGROUND_CRACKS)
+        # np.savetxt(file_path_save+'\\'+name_cracks+'.txt', IMG_BACKGROUND_depthed, fmt='%.2f', header=f'{name_cracks}\n\n', comments='', delimiter='    ')
 
-        # 背景mask保存
-        name_background = str(index_save)+'_background_mask'
-        cv2.imwrite(file_path_save+'\\'+name_background+'.png', IMG_BACKGROUND_CRACKS_HOLES)
-        IMG_BACKGROUND_CRACKS_HOLES_depthed = add_depth_column(IMG_BACKGROUND_CRACKS_HOLES)
-        np.savetxt(file_path_save+'\\'+name_background+'.txt', IMG_BACKGROUND_CRACKS_HOLES_depthed, fmt='%.2f', header=f'{name_background}\n\n', comments='', delimiter='    ')
+        ####### 背景mask保存
+        # name_background = str(index_save)+'_background_mask'
+        # cv2.imwrite(file_path_save+'\\'+name_background+'.png', IMG_BACKGROUND_CRACKS_HOLES)
+        # IMG_BACKGROUND_CRACKS_HOLES_depthed = add_depth_column(IMG_BACKGROUND_CRACKS_HOLES)
+        # np.savetxt(file_path_save+'\\'+name_background+'.txt', IMG_BACKGROUND_CRACKS_HOLES_depthed, fmt='%.2f', header=f'{name_background}\n\n', comments='', delimiter='    ')
 
-        # 孔洞mask保存
-        name_holes = str(index_save)+'_holes_mask'
-        cv2.imwrite(file_path_save+'\\'+name_holes+'.png', IMG_BACKGROUND_HOLES)
-        IMG_BACKGROUND_HOLES_depthed = add_depth_column(IMG_BACKGROUND_HOLES)
-        np.savetxt(file_path_save+'\\'+name_holes+'.txt', IMG_BACKGROUND_HOLES_depthed, fmt='%.2f', header=f'{name_holes}\n\n', comments='', delimiter='    ')
+        ####### 孔洞mask保存
+        # name_holes = str(index_save)+'_holes_mask'
+        # cv2.imwrite(file_path_save+'\\'+name_holes+'.png', IMG_BACKGROUND_HOLES)
+        # IMG_BACKGROUND_HOLES_depthed = add_depth_column(IMG_BACKGROUND_HOLES)
+        # np.savetxt(file_path_save+'\\'+name_holes+'.txt', IMG_BACKGROUND_HOLES_depthed, fmt='%.2f', header=f'{name_holes}\n\n', comments='', delimiter='    ')
 
-        #
-        df_background_para_final = df_background_para_adjust_final(df_background_para, window_length=100)
-        df_background_para.to_csv(file_path_save + '\\' + str(index_save) + '_background_para_origin.csv', index=False)
-        df_background_para_final.to_csv(file_path_save+'\\'+str(index_save)+'_background_para_processed.csv', index=False)
+        df_background_para_final = df_background_para_adjust_final(df_background_para, window_length=200)
+        # df_background_para.to_csv(file_path_save + '\\' + str(index_save) + '_background_para_origin.csv', index=False)
+        # df_background_para_final.to_csv(file_path_save+'\\'+str(index_save)+'_background_para_processed.csv', index=False)
 
-        # visualize_well_logs(
-        #     data=df_backfround_para,
-        #     depth_col='depth',
-        #     curve_cols=cols_cracks+cols_holes,
-        # )
-        # visualize_well_logs(
-        #     data=df_backfround_para_final,
-        #     depth_col='depth',
-        #     curve_cols=cols_cracks+cols_holes,
-        # )
-        # show_Pic([IMG_BACKGROUND, IMG_BACKGROUND_CRACKS_HOLES, IMG_BACKGROUND_HOLES], pic_order='13', figure=(9, 18))
+        visualize_well_logs(
+            data=df_background_para,
+            depth_col='depth',
+            curve_cols=cols_cracks+cols_holes,
+        )
+        visualize_well_logs(
+            data=df_background_para_final,
+            depth_col='depth',
+            curve_cols=cols_cracks+cols_holes,
+        )
+        show_Pic([IMG_BACKGROUND_CRACKS, IMG_BACKGROUND_CRACKS_HOLES, IMG_BACKGROUND_HOLES], pic_order='13', figure=(9, 18))

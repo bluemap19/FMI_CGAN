@@ -3,11 +3,9 @@ import cv2
 import numpy as np
 import pandas as pd
 from torch.utils.data import Dataset
-
-from fracture_mask_simulate.simulate_fractures_layer import df_background_para_adjust_final
 from src_ele.dir_operation import search_files_by_criteria
 from src_ele.pic_opeeration import show_Pic
-
+np.set_printoptions(precision=6, suppress=True)
 
 
 class FMIDataset():
@@ -15,7 +13,7 @@ class FMIDataset():
         电成像数据集类
         用于加载和处理单个FMI电成像数据集
     """
-    def __init__(self, path_dyna=r'F:\DeepLData\FMI_SIMULATION\simu_FMI_2\4_fmi_dyna.png', windows_length=400, windows_step=100):
+    def __init__(self, path_dyna=r'F:\DeepLData\FMI_SIMULATION\simu_FMI_2\4_fmi_dyna.png', windows_length=200, windows_step=100):
         """
             初始化电成像数据集
             参数:
@@ -28,23 +26,21 @@ class FMIDataset():
         self.path_stat = path_dyna.replace('_fmi_dyna.png', '_fmi_stat.png')
         self.path_mask_cracks = path_dyna.replace('_fmi_dyna.png', '_cracks_mask.png')
         self.path_mask_holes = path_dyna.replace('_fmi_dyna.png', '_holes_mask.png')
-        self.path_paras_processed = path_dyna.replace('_fmi_dyna.png', '_background_para_processed.csv')
-        self.path_paras_origin = path_dyna.replace('_fmi_dyna.png', '_background_para_origin.csv')
+        self.path_paras = path_dyna.replace('_fmi_dyna.png', '_background_para_processed.csv')
 
         # 加载图像和数据
         self.fmi_dyna = self.load_image(self.path_dyna)
         self.fmi_stat = self.load_image(self.path_stat)
         self.fmi_mask_cracks = self.load_image(self.path_mask_cracks)
         self.fmi_mask_holes = self.load_image(self.path_mask_holes)
-        self.fmi_paras_o = pd.read_csv(self.path_paras_origin)
-        self.fmi_paras_p = df_background_para_adjust_final(self.fmi_paras_o, window_length=windows_length)
+        self.fmi_paras = pd.read_csv(self.path_paras)
 
         # 验证所有图像具有相同的高度
         heights = [img.shape[0] for img in [self.fmi_dyna, self.fmi_stat, self.fmi_mask_cracks, self.fmi_mask_holes]]
         if len(set(heights)) > 1:
             raise ValueError("所有图像必须具有相同的高度")
 
-        self.cols_paras = self.fmi_paras_p.columns.tolist()
+        self.cols_paras = self.fmi_paras.columns.tolist()
         self.windows_length = windows_length
         self.windows_step = windows_step
         self.total_rows = self.fmi_dyna.shape[0]
@@ -79,9 +75,9 @@ class FMIDataset():
             'fmi_stat': cv2.resize(self.fmi_stat[start_index:end_index], ouu_shape),
             'fmi_mask_cracks': cv2.resize(self.fmi_mask_cracks[start_index:end_index], ouu_shape),
             'fmi_mask_holes': cv2.resize(self.fmi_mask_holes[start_index:end_index], ouu_shape),
-            'fmi_paras': self.fmi_paras_p.iloc[(start_index+end_index)//2]
+            'fmi_paras': self.fmi_paras.loc[(start_index + end_index) // 2, ['crack_length', 'crack_width', 'crack_area', 'crack_density', 'hole_area', 'hole_density', 'hole_area_ratio']].values,
+            # 'fmi_paras': self.fmi_paras.loc[(start_index + end_index) // 2, ['crack_length', 'crack_width', 'crack_area', 'crack_density', 'hole_area', 'hole_density', 'hole_area_ratio']],
         }
-
         return pic_dict
 
 
@@ -91,7 +87,7 @@ class dataloader_FMI_logging(Dataset):
         电成像数据加载器
         用于加载多个电成像数据集
     """
-    def __init__(self, path_folder=r'F:\DeepLData\FMI_SIMULATION\simu_FMI_2', len_windows=400, step_windows=10, out_shape=256):
+    def __init__(self, path_folder=r'F:\DeepLData\FMI_SIMULATION\simu_FMI', len_windows=200, step_windows=10, out_shape=256):
         """
         初始化数据加载器
         参数:
@@ -184,7 +180,7 @@ if __name__ == '__main__':
         # 初始化数据加载器
         data_loader = dataloader_FMI_logging(
             path_folder=r'F:\DeepLData\FMI_SIMULATION\simu_FMI_2',
-            len_windows=400,
+            len_windows=200,
             step_windows=10
         )
 
@@ -197,7 +193,7 @@ if __name__ == '__main__':
             print(f"  {key}: {value}")
 
         # 测试获取不同索引的数据
-        test_indices = [0, 100, 1000, 5000, len(data_loader) - 1]
+        test_indices = [0, 101, 500, 1000, len(data_loader) - 1]
 
         for idx in test_indices:
             try:
@@ -209,7 +205,7 @@ if __name__ == '__main__':
                 print(f"  静态图像形状: {data['fmi_stat'].shape}")
                 print(f"  裂缝掩模形状: {data['fmi_mask_cracks'].shape}")
                 print(f"  孔洞掩模形状: {data['fmi_mask_holes'].shape}")
-                print(f"  参数数据: {data['fmi_paras']}")
+                print(f"  参数数据: {type(data['fmi_paras'])} -》 \n{data['fmi_paras']}")
                 show_Pic([data['fmi_dyna'], data['fmi_stat'], data['fmi_mask_cracks'], data['fmi_mask_holes']])
             except Exception as e:
                 print(f"获取索引 {idx} 失败: {str(e)}")

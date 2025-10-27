@@ -264,6 +264,7 @@ class cracks_simulation(object):
         for i in range(0, len(depth)):
             crack_area[i] = np.sum(fracture_t[i, :])/255
             crack_length[i] = crack_area[i]/crack_width[i]
+
         dp_crack_para = pd.DataFrame({
             'depth': depth,
             'crack_length': crack_length,
@@ -273,8 +274,6 @@ class cracks_simulation(object):
             'crack_inclination': crack_inclination,
             'crack_density': crack_density
         })
-        # # 设置深度列为索引
-        # dp_crack_para.set_index('depth', inplace=False)
         return fracture_t, config_crack, dp_crack_para
 
     # 在给定的图像上，给定指定的裂缝参数，新增多个裂缝
@@ -346,7 +345,7 @@ class cracks_simulation(object):
             fracture_config, fracture_parameter = self.adjust_crack_para_by_target_window_height(fracture_config, fracture_parameter, fracture_t_reshape.shape)
 
             # 裂缝图像信息，合并到背景图像上
-            IMG[crack_start_height:height_draw + crack_start_height, :] += fracture_t_reshape
+            IMG[crack_start_height:height_draw+crack_start_height, :] += fracture_t_reshape
             # 裂缝参数dataframe的合并，将裂缝的参数进行累加合并到地层总的裂缝参数曲线上
             df_cracks_para.loc[crack_start_height:height_draw+crack_start_height-1, list_paras] += fracture_parameter[list_paras].values
             # visualize_well_logs(

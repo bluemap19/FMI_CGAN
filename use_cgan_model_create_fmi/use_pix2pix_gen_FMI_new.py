@@ -112,8 +112,6 @@ def use_pix2pix_gen_FMI(opt):
     # Tensor type
     Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
 
-    prev_time = time.time()
-
     img_gan = np.array([])
     with torch.no_grad():
         for i, mask in enumerate(dataloader):
@@ -139,10 +137,10 @@ def use_pix2pix_gen_FMI(opt):
     cv2.imwrite(path_o.replace('background_mask', 'fmi_dyna'), (img_dyna_gan_full).astype(np.uint8))
     cv2.imwrite(path_o.replace('background_mask', 'fmi_stat'), (img_stat_gan_full).astype(np.uint8))
     img_dyna_gan_full = add_depth_column(img_dyna_gan_full)
-    np.savetxt(path_o.replace('.png', '_dyna.txt'), (img_dyna_gan_full).astype(np.uint8), comments='', delimiter='    ', fmt='%.2f',
+    np.savetxt(path_o.replace('background_mask.png', 'fmi_dyna_simu.txt'), img_dyna_gan_full, comments='', delimiter='    ', fmt='%.2f',
                header='simu_dyna\n100\n104\nIMAGE.DYNA_SIMU\n\n\n\n')
     img_stat_gan_full = add_depth_column(img_stat_gan_full)
-    np.savetxt(path_o.replace('.png', '_stat.txt'), (img_stat_gan_full).astype(np.uint8), comments='', delimiter='    ', fmt='%.2f',
+    np.savetxt(path_o.replace('background_mask.png', 'fmi_stat_simu.txt'), img_stat_gan_full, comments='', delimiter='    ', fmt='%.2f',
                header='simu_stat\n100\n104\nIMAGE.STAT_SIMU\n\n\n\n')
 
 
