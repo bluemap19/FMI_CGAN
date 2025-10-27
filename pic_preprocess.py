@@ -635,6 +635,10 @@ def random_morphology(image, ratio=random.random(), k_size=None):
     参数:
     image: 输入图像（灰度或二值图像）
     ratio: 随机选择形态学操作的参数（0-1之间），如果为None则随机生成
+    <0.25：溶蚀（腐蚀）
+    <0.50：膨胀
+    <0.75:开运算（先腐蚀后膨胀）
+    <1.00:闭运算（先膨胀后腐蚀）
     k_size: 核大小（奇数），如果为None则随机生成
 
     返回:

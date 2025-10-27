@@ -60,12 +60,12 @@ def df_background_para_adjust_final(df, window_length=5):
         window_df = df.iloc[start_idx:end_idx]
 
         # 5.1 累加列
-        crack_length_sum = window_df['crack_length'].sum()
-        crack_area_sum = window_df['crack_area'].sum()
-        hole_area_sum = window_df['hole_area'].sum()
+        crack_length_sum = window_df['crack_length'].sum() * 0.00515
+        crack_area_sum = window_df['crack_area'].sum() * 0.00515 * 0.0025
+        hole_area_sum = window_df['hole_area'].sum() * 0.00515 * 0.0025
         hole_density_sum = window_df['hole_density'].sum()
         hole_area_ratio_sum = window_df['hole_area_ratio'].sum()
-        crack_width_sum = window_df['crack_width_adjusted'].sum()
+        crack_width_sum = window_df['crack_width_adjusted'].sum() * 0.0025
 
         # 5.2 直接复制列（不做修改）
         depth = window_df['depth'].iloc[0] if len(window_df) > 0 else 0
@@ -94,6 +94,32 @@ def df_background_para_adjust_final(df, window_length=5):
     result_df = pd.DataFrame(result_data)
     return result_df
 
+
+def add_depth_column(image_FMI):
+    """
+    为电成像图像数组添加索引列
+
+    参数:
+    stat_image: 原始图像数组 (10000×256)
+
+    返回:
+    添加索引列后的新数组 (10000×257)
+    """
+    # 1. 验证输入
+    if not isinstance(image_FMI, np.ndarray):
+        raise TypeError("输入必须是numpy数组")
+
+    # 2. 创建深度列 (0-9999的等差数列)
+    depth_column = np.arange(0, image_FMI.shape[0]).reshape(-1, 1)
+
+    # 3. 将索引列添加到原始数组的第一列
+    # 使用np.hstack水平拼接
+    # result = np.hstack((depth_column, stat_image))
+
+    # 或者使用np.c_更简洁
+    result = np.c_[depth_column, image_FMI]
+
+    return result
 
 
 if __name__ == '__main__':
@@ -130,16 +156,16 @@ if __name__ == '__main__':
     #     IMG_LIST.append(block_image)
     # show_Pic(IMG_LIST, pic_order='36', figure=(20, 10))
 
-    for i in range(5):
-        IMG_BACKGROUND = np.zeros((2000, 256), dtype=np.uint8)
+    for i in range(20):
+        IMG_BACKGROUND_CRACKS = np.zeros((100000, 256), dtype=np.uint8)
 
         # 存放9个孔洞缝参数，分别是 裂缝密度、裂缝张开度、裂缝长度、裂缝有效面积、面孔率、孔洞密度、孔洞面积
         # 'crack_length', 'crack_width', 'crack_area', 'crack_angle', 'crack_inclination', 'crack_density', 'hole_area', 'hole_density', 'hole_area_ratio'
-        crack_hole_parameter = np.zeros((IMG_BACKGROUND.shape[0], 10), dtype=np.float64)
-        depth_array = np.linspace(start=0, stop=IMG_BACKGROUND.shape[0]-1, num=IMG_BACKGROUND.shape[0])
-        df_backfround_para = pd.DataFrame(crack_hole_parameter, columns=['depth', 'crack_length', 'crack_width', 'crack_area', 'crack_angle', 'crack_inclination', 'crack_density', 'hole_area', 'hole_density', 'hole_area_ratio'])
-        df_backfround_para['depth'] = depth_array
-        df_backfround_para.astype(np.float64)
+        crack_hole_parameter = np.zeros((IMG_BACKGROUND_CRACKS.shape[0], 10), dtype=np.float64)
+        depth_array = np.linspace(start=0, stop=IMG_BACKGROUND_CRACKS.shape[0] - 1, num=IMG_BACKGROUND_CRACKS.shape[0])
+        df_background_para = pd.DataFrame(crack_hole_parameter, columns=['depth', 'crack_length', 'crack_width', 'crack_area', 'crack_angle', 'crack_inclination', 'crack_density', 'hole_area', 'hole_density', 'hole_area_ratio'])
+        df_background_para['depth'] = depth_array
+        df_background_para.astype(np.float64)
 
         cols_cracks = ['crack_length', 'crack_width', 'crack_area', 'crack_angle', 'crack_inclination', 'crack_density']
         cols_holes = ['hole_area', 'hole_density', 'hole_area_ratio']
@@ -150,7 +176,7 @@ if __name__ == '__main__':
         crack_x_shift = random.random()
         file_path_save = r'F:\DeepLData\FMI_SIMULATION\simu_cracks_2'           # 必须全英文
 
-        while (end_index < IMG_BACKGROUND.shape[0]-min_crack_height):
+        while (end_index < IMG_BACKGROUND_CRACKS.shape[0] - min_crack_height):
             mode_random = random.random()
             if mode_random < 0.5:
                 # 为地层新增多缝
@@ -160,33 +186,51 @@ if __name__ == '__main__':
                 crack, config_crack, df_cracks_para = CS.genrate_random_single_crack(config_crack={'height_background': np.random.randint(100, 400), 'crack_x_shift': crack_x_shift*(0.5+1.0*random.random())})
 
             # 把产生的裂缝信息， 随机压缩， 并添加到地层背景上
-            height_random = random.randint(min_crack_height, min(max_crack_height, IMG_BACKGROUND.shape[0]-end_index))
+            height_random = random.randint(min_crack_height, min(max_crack_height, IMG_BACKGROUND_CRACKS.shape[0] - end_index))
             crack = cv2.resize(crack, (256, height_random))
             config_crack_n, df_cracks_para_n = CS.adjust_crack_para_by_target_window_height(config_crack, df_cracks_para, (height_random, 256))
 
             # 图像合并
-            IMG_BACKGROUND[end_index:end_index + height_random, :] = crack
+            IMG_BACKGROUND_CRACKS[end_index:end_index + height_random, :] = crack
             # 裂缝的参数合并
-            df_backfround_para.loc[end_index:end_index+height_random-1, cols_cracks] += df_cracks_para_n[cols_cracks].values
+            df_background_para.loc[end_index:end_index + height_random - 1, cols_cracks] += df_cracks_para_n[cols_cracks].values
             end_index += height_random
 
             end_index += random.randint(100, 500)
 
         # 添加随机的地层孔洞信息
-        IMG_BACKGROUND_CRACKS_HOLES, holes_location, df_hole_para = HS.add_vugs_random(IMG_BACKGROUND, vug_num_p=np.random.randint(IMG_BACKGROUND.shape[0]//25, IMG_BACKGROUND.shape[0]//25*2), ratio_repetition=0.05, vugs_shape_configuration=[[2, 40], [2, 40]])
+        IMG_BACKGROUND_CRACKS_HOLES, holes_location, df_hole_para = HS.add_vugs_random(IMG_BACKGROUND_CRACKS, vug_num_p=np.random.randint(IMG_BACKGROUND_CRACKS.shape[0] // 25, IMG_BACKGROUND_CRACKS.shape[0] // 25 * 2), ratio_repetition=0.05, vugs_shape_configuration=[[2, 40], [2, 40]])
 
-        IMG_BACKGROUND_HOLES = IMG_BACKGROUND_CRACKS_HOLES.copy() - IMG_BACKGROUND.copy()
+        IMG_BACKGROUND_HOLES = IMG_BACKGROUND_CRACKS_HOLES.copy() - IMG_BACKGROUND_CRACKS.copy()
         ellipse_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
         IMG_BACKGROUND_HOLES = cv2.morphologyEx(IMG_BACKGROUND_HOLES.copy(), cv2.MORPH_OPEN, ellipse_kernel)
         _, IMG_BACKGROUND_HOLES = cv2.threshold(IMG_BACKGROUND_HOLES, 5, 255, cv2.THRESH_BINARY)  # cv2.THRESH_BINARY：当像素值大于阈值时，赋予最大值；否则为0。
-        df_backfround_para[cols_holes] = df_hole_para[cols_holes]
+        df_background_para[cols_holes] = df_hole_para[cols_holes]
 
-        cv2.imwrite(file_path_save+'\\'+str(i+5)+'_cracks_mask.png', IMG_BACKGROUND)
-        cv2.imwrite(file_path_save+'\\'+str(i+5)+'_background_mask.png', IMG_BACKGROUND_CRACKS_HOLES)
-        cv2.imwrite(file_path_save+'\\'+str(i+5)+'_holes_mask.png', IMG_BACKGROUND_HOLES)
-        df_backfround_para_final = df_background_para_adjust_final(df_backfround_para, window_length=80)
-        df_backfround_para.to_csv(file_path_save+'\\'+str(i+5)+'_background_para_origin.csv', index=False)
-        df_backfround_para_final.to_csv(file_path_save+'\\'+str(i+5)+'_background_para_processed.csv', index=False)
+        index_save = i
+
+        # 裂缝mask保存
+        name_cracks = str(index_save)+'_cracks_mask'
+        cv2.imwrite(file_path_save +'\\' + name_cracks +'.png', IMG_BACKGROUND_CRACKS)
+        IMG_BACKGROUND_depthed = add_depth_column(IMG_BACKGROUND_CRACKS)
+        np.savetxt(file_path_save+'\\'+name_cracks+'.txt', IMG_BACKGROUND_depthed, fmt='%.2f', header=f'{name_cracks}\n\n', comments='', delimiter='    ')
+
+        # 背景mask保存
+        name_background = str(index_save)+'_background_mask'
+        cv2.imwrite(file_path_save+'\\'+name_background+'.png', IMG_BACKGROUND_CRACKS_HOLES)
+        IMG_BACKGROUND_CRACKS_HOLES_depthed = add_depth_column(IMG_BACKGROUND_CRACKS_HOLES)
+        np.savetxt(file_path_save+'\\'+name_background+'.txt', IMG_BACKGROUND_CRACKS_HOLES_depthed, fmt='%.2f', header=f'{name_background}\n\n', comments='', delimiter='    ')
+
+        # 孔洞mask保存
+        name_holes = str(index_save)+'_holes_mask'
+        cv2.imwrite(file_path_save+'\\'+name_holes+'.png', IMG_BACKGROUND_HOLES)
+        IMG_BACKGROUND_HOLES_depthed = add_depth_column(IMG_BACKGROUND_HOLES)
+        np.savetxt(file_path_save+'\\'+name_holes+'.txt', IMG_BACKGROUND_HOLES_depthed, fmt='%.2f', header=f'{name_holes}\n\n', comments='', delimiter='    ')
+
+        #
+        df_background_para_final = df_background_para_adjust_final(df_background_para, window_length=100)
+        df_background_para.to_csv(file_path_save + '\\' + str(index_save) + '_background_para_origin.csv', index=False)
+        df_background_para_final.to_csv(file_path_save+'\\'+str(index_save)+'_background_para_processed.csv', index=False)
 
         # visualize_well_logs(
         #     data=df_backfround_para,

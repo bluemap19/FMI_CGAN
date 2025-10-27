@@ -1,6 +1,8 @@
 import math
 import os
 import pandas as pd
+from skimage import exposure
+
 from src_plot.plot_logging import visualize_well_logs
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'  # 在导入任何库之前设置
 import cv2
@@ -362,8 +364,10 @@ def adjust_pic_range(img, middle, lower, upper):
     current_median = np.median(img)
 
     # 3. 计算当前图像的分布范围
-    current_lower = np.percentile(img, 15.87)  # 约等于μ-σ (标准正态分布)
-    current_upper = np.percentile(img, 84.13)  # 约等于μ+σ (标准正态分布)
+    # current_lower = np.percentile(img, 15.87)  # 约等于μ-σ (标准正态分布)
+    # current_upper = np.percentile(img, 84.13)  # 约等于μ+σ (标准正态分布)
+    current_lower = np.percentile(img, 9)  # 约等于μ-2σ (标准正态分布)
+    current_upper = np.percentile(img, 91)  # 约等于μ+2σ (标准正态分布)
 
     # 4. 计算缩放因子和偏移量
     # 计算当前分布范围到目标分布范围的缩放因子
@@ -391,25 +395,189 @@ def adjust_pic_range(img, middle, lower, upper):
     return adjusted_img.astype(img.dtype)
 
 
+def dynamic_enhancement_function(img):
+    """
+    电成像图像动态增强函数（简化版）
+
+    该函数针对电成像数据的特点，专注于三个核心增强技术：
+    1. 自适应直方图均衡化（CLAHE）增强局部对比度
+    2. 多尺度锐化增强地质特征
+    3. 动态范围调整优化整体对比度
+
+    参数:
+    img: 输入图像 (256×256 numpy数组), 值范围0-1或0-255
+
+    返回:
+    增强后的图像 (256×256 numpy数组), 值范围与输入相同
+    """
+    # ========================
+    # 1. 输入验证和预处理
+    # ========================
+    # 验证输入是否为256×256的numpy数组
+    if not isinstance(img, np.ndarray):
+        raise ValueError("输入必须是 M×N 的numpy数组")
+
+    # 保存原始数据类型和范围
+    original_dtype = img.dtype
+    is_normalized = np.max(img) <= 1.0  # 检查是否在0-1范围内
+
+    # 转换为浮点类型并归一化到0-1范围
+    if is_normalized:
+        img_float = img.astype(np.float32)
+    else:
+        img_float = img.astype(np.float32) / 255.0
+
+    # ===================================
+    # 2. 自适应直方图均衡化（CLAHE）
+    # ===================================
+    # 增强局部对比度，特别适合电成像中的地层特征
+    # 将图像转换为0-255范围用于CLAHE处理
+    img_8bit = (img_float * 255).astype(np.uint8)
+
+    # 创建CLAHE对象
+    # clipLimit=2.0：限制对比度增强幅度，避免噪声放大
+    # tileGridSize=(8,8)：将图像分为8x8的小块进行局部均衡化
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+
+    # 应用CLAHE
+    clahe_enhanced = clahe.apply(img_8bit)
+
+    # 转换回浮点类型
+    clahe_enhanced = clahe_enhanced.astype(np.float32) / 255.0
+
+    # ===================================
+    # 3. 多尺度锐化增强地质特征
+    # ===================================
+    # 使用不同尺度的锐化增强不同大小的地质特征
+    # 小尺度锐化增强微裂缝
+    # 使用高斯模糊和减法实现锐化
+    blurred_small = cv2.GaussianBlur(clahe_enhanced, (0, 0), sigmaX=1.0)
+    sharpened_small = cv2.addWeighted(clahe_enhanced, 1.5, blurred_small, -0.5, 0)
+
+    # 中尺度锐化增强中等特征
+    blurred_medium = cv2.GaussianBlur(clahe_enhanced, (0, 0), sigmaX=3.0)
+    sharpened_medium = cv2.addWeighted(clahe_enhanced, 1.2, blurred_medium, -0.2, 0)
+
+    # 大尺度锐化增强地层结构
+    blurred_large = cv2.GaussianBlur(clahe_enhanced, (0, 0), sigmaX=7.0)
+    sharpened_large = cv2.addWeighted(clahe_enhanced, 1.1, blurred_large, -0.1, 0)
+
+    # 加权融合多尺度锐化结果
+    # 权重分配：小尺度特征最重要，大尺度特征次要
+    sharpened = 0.5 * sharpened_small + 0.3 * sharpened_medium + 0.2 * sharpened_large
+    sharpened = np.clip(sharpened, 0, 1)  # 确保值在0-1范围内
+
+    # ===================================
+    # 4. 动态范围调整优化
+    # ===================================
+    # 自适应调整图像的动态范围
+    # 使用2%和98%百分位值排除极端值
+    v_min, v_max = np.percentile(sharpened, (2, 98))
+
+    # 重新缩放强度范围
+    adjusted = exposure.rescale_intensity(
+        sharpened,
+        in_range=(v_min, v_max),
+        out_range=(0, 1)
+    )
+
+    # ===================================
+    # 5. 裂缝特征增强
+    # ===================================
+    # 专门增强电成像中的裂缝特征
+    # 计算梯度幅度（裂缝通常有高梯度）
+    grad_x = cv2.Sobel(adjusted, cv2.CV_32F, 1, 0, ksize=3)
+    grad_y = cv2.Sobel(adjusted, cv2.CV_32F, 0, 1, ksize=3)
+    grad_mag = np.sqrt(grad_x ** 2 + grad_y ** 2)
+    grad_mag = grad_mag / np.max(grad_mag)  # 归一化到0-1
+
+    # 创建裂缝增强掩模（高梯度区域）
+    fracture_threshold = 0.7  # 裂缝增强阈值
+    fracture_mask = np.where(grad_mag > fracture_threshold, 1.0, 0.0)
+
+    # 增强裂缝区域（增加对比度）
+    fracture_enhanced = adjusted.copy()
+    fracture_enhanced = fracture_enhanced * (1 - fracture_mask) + (fracture_enhanced * 1.5) * fracture_mask
+    fracture_enhanced = np.clip(fracture_enhanced, 0, 1)
+
+    # ===================================
+    # 6. 伽马校正优化整体视觉效果
+    # ===================================
+    # 调整图像的整体亮度分布
+    gamma = 0.9  # 伽马值 < 1 增强暗部，> 1 增强亮部
+    gamma_corrected = exposure.adjust_gamma(fracture_enhanced, gamma)
+
+    # ========================
+    # 后处理
+    # ========================
+    # 转换为原始数据类型和范围
+    if is_normalized:
+        result = gamma_corrected.astype(original_dtype)
+    else:
+        result = (gamma_corrected * 255).astype(original_dtype)
+
+    return result
+
+
+def stat_pic_dynamic_enhancement(stat_img, windows_length=20, step=1):
+    """
+    将静态的FMI图像，增强为动态FMI图像，逐窗口处理
+    stat_img:静态电成像的FMI数据
+    windows_length：遍历的窗长设定
+    sttp:遍历的步长设定
+    """
+    windows_num = (stat_img.shape[0] - windows_length)//step + 1
+    dyna_img = stat_img.copy()
+
+    for i in range(windows_num):
+        if i == windows_num - 1:
+            window_stat = stat_img[-windows_length:, :]
+        else:
+            window_stat = stat_img[i*step:i*step+windows_length, :]
+
+        windows_dyna = dynamic_enhancement_function(window_stat)
+
+        if i == windows_num-1:
+            dyna_img[-windows_length:, :] = windows_dyna
+        else:
+            dyna_img[i*step:i*step+windows_length, :] = windows_dyna
+
+    return dyna_img
+
+
 class ImageDataset_FMI_SPLIT_NO_REPEAT(Dataset):
     def __init__(self, path=r'F:\DeepLData\FMI_SIMULATION\simu_cracks_2\9_background_mask.png',
                  x_l=256, y_l=256, win_len=250):
         super().__init__()
         if os.path.exists(path):
+            # 动态dyna_mask为对应的读取的原始mask数据
             self.mask_background = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
             self.mask_dyna = self.mask_background.copy()
-            # self.mask_stat = self.mask_background.copy()
-            self.mask_stat = random_morphology(self.mask_background.copy(), ratio=np.random.random(), k_size=None)
+
+            # # self.mask_stat = self.mask_background.copy()
+            # # <0.25：溶蚀（腐蚀） <0.50：膨胀 <0.75:开运算（先腐蚀后膨胀） <1.00:闭运算（先膨胀后腐蚀）
+            self.mask_stat_p = random_morphology(self.mask_background.copy(), ratio=0.1, k_size=None)
+            # 静态mask对应的噪声
+            self.mask_stat_noise = np.random.random((self.mask_dyna.shape[0]//8, self.mask_dyna.shape[1]//8))*255
+            self.mask_stat_noise = cv2.resize(self.mask_stat_noise, (self.mask_dyna.shape[1], self.mask_dyna.shape[0]))
+            # _, self.mask_stat = cv2.threshold(self.mask_stat, 125, 255, cv2.THRESH_BINARY)    # 不能进行二值化，否则输出图像就显得很机械
+
+            # 静态 stat_mask 为对应的读取的原始mask数据进行(溶蚀)处理后 加0.5的噪声 处理
+            # self.mask_stat = self.mask_stat*0.65 + self.mask_stat_p*0.35
+            self.mask_stat = self.mask_stat_noise*0.5 + self.mask_stat_p*0.5
         else:
             print(f'path {path} does not exist')
             exit(0)
         self.shape_full_fmi = self.mask_background.shape
 
-        self.x_l = x_l
-        self.y_l = y_l
-        self.win_len = win_len
+        self.x_l = x_l              # 输出图像的x方向长度
+        self.y_l = y_l              # 输出图像的y方向长度
+        self.win_len = win_len      # 窗口截取图像的 窗口长度
 
+        # 计算dataloader长度，看需要把FMI数据分成几张窗口数据
         self.length = math.ceil(self.mask_background.shape[0]/self.win_len)
+
+        # 生成stat静态FMI图像对应的电阻率配置
         self.random_curves = get_random_logging(
             resolution=0.0025,
             depth_start=1000,
@@ -422,6 +590,7 @@ class ImageDataset_FMI_SPLIT_NO_REPEAT(Dataset):
                               [10, 0.939], [20, 0.939], [30, 0.958], [30, 0.958], [20, 0.958], [10, 0.958]]
         )
 
+        # self.dyna_mask_8，self.stat_mask_8 为动静态的mask8对应的图像矩阵分布，这里使用随机数，进行噪声随机分布添加
         random_matrix = np.random.randint(0, 256, size=(8 * self.length, 8), dtype=np.uint8)
         self.dyna_mask_8 = cv2.resize(random_matrix, (self.shape_full_fmi[1], self.shape_full_fmi[0]))
         random_matrix = np.random.randint(0, 256, size=(8 * self.length, 8), dtype=np.uint8)
@@ -443,12 +612,13 @@ class ImageDataset_FMI_SPLIT_NO_REPEAT(Dataset):
             dyna_8 = self.dyna_mask_8[index*self.win_len:(index+1)*self.win_len, :]
             stat_8 = self.stat_mask_8[index*self.win_len:(index+1)*self.win_len, :]
 
+        # 要缩放成模型可以认可的 指定的 长宽 的图像
         mask_dyna = cv2.resize(mask_dyna, (self.y_l, self.x_l))
         mask_stat = cv2.resize(mask_stat, (self.y_l, self.x_l))
         dyna_8 = cv2.resize(dyna_8, (self.y_l, self.x_l))
         stat_8 = cv2.resize(stat_8, (self.y_l, self.x_l))
         _, mask_dyna = cv2.threshold(mask_dyna, 5, 255, cv2.THRESH_BINARY)
-        _, mask_stat = cv2.threshold(mask_stat, 5, 255, cv2.THRESH_BINARY)
+        # _, mask_stat = cv2.threshold(mask_stat, 5, 255, cv2.THRESH_BINARY)            # mask_stat不能进行二值化，否则其对应的stat fmi数据会显得很人造
 
         mask_dyna = mask_dyna/256
         mask_stat = mask_stat/256
@@ -465,6 +635,9 @@ class ImageDataset_FMI_SPLIT_NO_REPEAT(Dataset):
         return self.length
 
     def adjust_pic_by_r_curve(self, pic_list=[], index=0):
+        """
+        通过dataloader生成的随机测井曲线，随机上下限，调整静态图像的图像范围
+        """
         # 'depth': depth.ravel(),
         # 'middle_values': normalized.ravel()*255,
         # 'N_lower_values': N_lower.ravel()*255,
@@ -487,18 +660,22 @@ class ImageDataset_FMI_SPLIT_NO_REPEAT(Dataset):
         return self.shape_full_fmi
 
     def combine_pic_list_to_full_fmi(self, img_gan):
-        print(img_gan.shape)
-        # combine fracture to a layer FMI image
+        """
+        # combine splits pic (from model) to a layer FMI image
+        将模型输出的电成像数据进行合并，合并成完整的FMI数据
+        """
         img_dyna_gan_full = np.zeros(self.get_base_shape())
         img_stat_gan_full = np.zeros(self.get_base_shape())
+        # 根据模型生成的电成像图像矩阵[M*2*256*256]，逐窗口进行，电成像测井图像数据的合并
         for i in range(img_gan.shape[0]):
             dyna_t = img_gan[i, 0, :, :]
             stat_t = img_gan[i, 1, :, :]
 
+            # 需要把模型输出数据进行shape的调整，调整为原始的模型输入数据
             dyna_t = cv2.resize(dyna_t, (self.shape_full_fmi[1], self.win_len))
             stat_t = cv2.resize(stat_t, (self.shape_full_fmi[1], self.win_len))
-            # print(dyna_t.shape)
 
+            # 将窗口数据，逐窗口进行合并
             if i != (img_gan.shape[0] - 1):
                 img_dyna_gan_full[i * self.win_len:(i + 1) * self.win_len, :] = dyna_t
                 img_stat_gan_full[i * self.win_len:(i + 1) * self.win_len, :] = stat_t
@@ -506,34 +683,27 @@ class ImageDataset_FMI_SPLIT_NO_REPEAT(Dataset):
                 img_dyna_gan_full[-self.win_len:, :] = dyna_t
                 img_stat_gan_full[-self.win_len:, :] = stat_t
 
-        window_adjust_stat_image = 16
+        # 图像的融合增强，逐窗口进行 stat_FMI 图像像素分布调整
+        window_adjust_stat_image = 64
         img_stat_adjust = img_stat_gan_full.copy()
         for i in range(img_stat_gan_full.shape[0]-window_adjust_stat_image):
             stat_data_windows = img_stat_gan_full[i:i+window_adjust_stat_image, :]
             stat_data_windows = self.adjust_pic_by_r_curve(pic_list=[stat_data_windows], index=i+window_adjust_stat_image//2)[0]
             img_stat_adjust[i:i + window_adjust_stat_image, :] = stat_data_windows
 
-        show_Pic([1-img_dyna_gan_full, 1-img_stat_gan_full, 1-img_stat_adjust], pic_order='13', figure=(6, 10))
+        # 动态电成像生成，根据 静态电成像 计算 动态电成像数据
+        img_dyna_fmi = stat_pic_dynamic_enhancement(img_stat_adjust, windows_length=20, step=1)
 
-        # img_dyna_gan_full = np.nan_to_num(img_dyna_gan_full, nan=0.0, posinf=255, neginf=0)
-        # img_stat_gan_full = np.nan_to_num(img_stat_gan_full, nan=0.0, posinf=255, neginf=0)
-        # # show_Pic([img_dyna_gan_full, img_stat_gan_full, img_mask_gan_full], pic_order='13', figuresize=(6, 9))
-        #
-        # img_stat_gan_full = correct_image_with_rxo(img_stat_gan_full, self.random_curves['normalized'].values, normalize_rxo=False)
-        #
-        # img_dyna_gan_full = img_dyna_gan_full * 255
-        # img_stat_gan_full = img_stat_gan_full * 255
-        # img_dyna_gan_full = dynamic_enhancement(img_stat_gan_full.astype(np.uint8), windows=10, step=1)
-        #
-        # show_Pic([img_dyna_gan_full, img_stat_gan_full], pic_order='12', figure=(4, 10))
+        img_dyna_fmi = img_dyna_fmi*255
+        img_stat_adjust = img_stat_adjust*255
+        # show_Pic([1-img_dyna_gan_full, 1-img_stat_gan_full, 1-img_stat_adjust, 1-img_dyna_fmi], pic_order='14', figure=(8, 10))
+        return img_stat_adjust, img_dyna_fmi
 
-        pass
 
 if __name__ == '__main__':
     a = ImageDataset_FMI_SPLIT_NO_REPEAT()
     for i in range(10):
         b = a[i]
-        # print(b.shape)
         show_Pic([b[0,:,:], b[1, :, :], b[2,:,:], b[3,:,:]], pic_order='22')
 
 # # 使用示例
@@ -558,3 +728,4 @@ if __name__ == '__main__':
 #         figsize=(8, 10),
 #         range_limits=[[0, 255], [0, 255], [0, 255], [0, 1], [0, 1], [0, 1]]
 #     )
+

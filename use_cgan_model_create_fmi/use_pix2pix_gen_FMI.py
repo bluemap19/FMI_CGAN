@@ -13,7 +13,7 @@ import torch
 from src_ele.ele_data_process import dynamic_enhancement
 from train_pix2pix_simulate.pix2pix import GeneratorUNet
 from src_ele.pic_opeeration import show_Pic
-from use_gan_model_create_fmi.dataloader_use_gan_model import ImageDataset_FMI_SIMULATE_LAYER
+from use_cgan_model_create_fmi.dataloader_use_gan_model import ImageDataset_FMI_SIMULATE_LAYER
 
 
 def correct_image_with_rxo(img_ele, rxo, normalize_rxo=False):
