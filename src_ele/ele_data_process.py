@@ -136,9 +136,6 @@ def pic_to_text(path=r'D:\1111\Input\zg112-r\zg112-1-r_6207.3027_6571.2021_XRMI_
     np.savetxt(path[:len_path-4]+'.txt', np.hstack((depth_data, img_data)),
         header='WELLNAME= {}\nSTDEP\t= {}\nENDEP\t= {}\nLEV\t= {}\nUNIT\t= meter\nCURNAMES= {}\n\n#DEPTH'.format(
         charter, depth_data[0][0], depth_data[-1][0], lev, 'IMAGE.DYNA_FULL'), delimiter='\t', comments='', fmt='%.4f')
-    pass
-
-
 
 
 def dynamic_enhancement(image_stat, step=2, windows=10):

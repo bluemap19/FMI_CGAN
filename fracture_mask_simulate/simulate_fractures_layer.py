@@ -164,8 +164,8 @@ if __name__ == '__main__':
     #     IMG_LIST.append(block_image)
     # show_Pic(IMG_LIST, pic_order='36', figure=(20, 10))
 
-    for i in range(20):
-        IMG_BACKGROUND_CRACKS = np.zeros((5000, 256), dtype=np.uint8)
+    for i in range(100):
+        IMG_BACKGROUND_CRACKS = np.zeros((10000, 256), dtype=np.uint8)
 
         # 存放9个孔洞缝参数，分别是 裂缝密度、裂缝张开度、裂缝长度、裂缝有效面积、面孔率、孔洞密度、孔洞面积
         # 'crack_length', 'crack_width', 'crack_area', 'crack_angle', 'crack_inclination', 'crack_density', 'hole_area', 'hole_density', 'hole_area_ratio'
@@ -180,10 +180,10 @@ if __name__ == '__main__':
 
         end_index = 0
         min_crack_height = 50
-        max_crack_height = 500
+        max_crack_height = 600
         crack_x_shift = random.random()
         # file_path_save = r'F:\DeepLData\FMI_SIMULATION\simu_cracks_2'           # 必须全英文
-        file_path_save = r'F:\DeepLData\FMI_SIMULATION\simu_cracks'           # 必须全英文
+        file_path_save = r'F:\DeepLData\FMI_SIMULATION\simu_cracks_3'           # 必须全英文
 
         while (end_index < IMG_BACKGROUND_CRACKS.shape[0] - min_crack_height):
             mode_random = random.random()
@@ -205,10 +205,12 @@ if __name__ == '__main__':
             df_background_para.loc[end_index:end_index + height_random - 1, cols_cracks] += df_cracks_para_n[cols_cracks].values
             end_index += height_random
 
-            end_index += random.randint(100, 500)
+            # 裂缝与裂缝之间，随机的间隔， 50*0.0025 或者是 600*0.0025
+            end_index += random.randint(50, 600)
 
+        vug_num_p = np.random.randint(IMG_BACKGROUND_CRACKS.shape[0] // 100, IMG_BACKGROUND_CRACKS.shape[0] // 100 * 10)
         # 添加随机的地层孔洞信息
-        IMG_BACKGROUND_CRACKS_HOLES, holes_location, df_hole_para = HS.add_vugs_random(IMG_BACKGROUND_CRACKS, vug_num_p=np.random.randint(IMG_BACKGROUND_CRACKS.shape[0] // 25, IMG_BACKGROUND_CRACKS.shape[0] // 25 * 2), ratio_repetition=0.05, vugs_shape_configuration=[[2, 40], [2, 40]])
+        IMG_BACKGROUND_CRACKS_HOLES, holes_location, df_hole_para = HS.add_vugs_random(IMG_BACKGROUND_CRACKS, vug_num_p=vug_num_p, ratio_repetition=0.05, vugs_shape_configuration=[[2, 40], [2, 40]])
 
         IMG_BACKGROUND_HOLES = IMG_BACKGROUND_CRACKS_HOLES.copy() - IMG_BACKGROUND_CRACKS.copy()
         ellipse_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
@@ -218,36 +220,37 @@ if __name__ == '__main__':
 
         index_save = i
 
-        ####### 裂缝mask保存
-        # name_cracks = str(index_save)+'_cracks_mask'
-        # cv2.imwrite(file_path_save +'\\' + name_cracks +'.png', IMG_BACKGROUND_CRACKS)
-        # IMG_BACKGROUND_depthed = add_depth_column(IMG_BACKGROUND_CRACKS)
-        # np.savetxt(file_path_save+'\\'+name_cracks+'.txt', IMG_BACKGROUND_depthed, fmt='%.2f', header=f'{name_cracks}\n\n', comments='', delimiter='    ')
+        ###### 裂缝mask保存
+        name_cracks = str(index_save)+'_cracks_mask'
+        cv2.imwrite(file_path_save +'\\' + name_cracks +'.png', IMG_BACKGROUND_CRACKS)
+        IMG_BACKGROUND_depthed = add_depth_column(IMG_BACKGROUND_CRACKS)
+        np.savetxt(file_path_save+'\\'+name_cracks+'.txt', IMG_BACKGROUND_depthed, fmt='%.2f', header=f'{name_cracks}\n\n', comments='', delimiter='    ')
 
-        ####### 背景mask保存
-        # name_background = str(index_save)+'_background_mask'
-        # cv2.imwrite(file_path_save+'\\'+name_background+'.png', IMG_BACKGROUND_CRACKS_HOLES)
-        # IMG_BACKGROUND_CRACKS_HOLES_depthed = add_depth_column(IMG_BACKGROUND_CRACKS_HOLES)
-        # np.savetxt(file_path_save+'\\'+name_background+'.txt', IMG_BACKGROUND_CRACKS_HOLES_depthed, fmt='%.2f', header=f'{name_background}\n\n', comments='', delimiter='    ')
+        ###### 背景mask保存
+        name_background = str(index_save)+'_background_mask'
+        cv2.imwrite(file_path_save+'\\'+name_background+'.png', IMG_BACKGROUND_CRACKS_HOLES)
+        IMG_BACKGROUND_CRACKS_HOLES_depthed = add_depth_column(IMG_BACKGROUND_CRACKS_HOLES)
+        np.savetxt(file_path_save+'\\'+name_background+'.txt', IMG_BACKGROUND_CRACKS_HOLES_depthed, fmt='%.2f', header=f'{name_background}\n\n', comments='', delimiter='    ')
 
-        ####### 孔洞mask保存
-        # name_holes = str(index_save)+'_holes_mask'
-        # cv2.imwrite(file_path_save+'\\'+name_holes+'.png', IMG_BACKGROUND_HOLES)
-        # IMG_BACKGROUND_HOLES_depthed = add_depth_column(IMG_BACKGROUND_HOLES)
-        # np.savetxt(file_path_save+'\\'+name_holes+'.txt', IMG_BACKGROUND_HOLES_depthed, fmt='%.2f', header=f'{name_holes}\n\n', comments='', delimiter='    ')
+        ###### 孔洞mask保存
+        name_holes = str(index_save)+'_holes_mask'
+        cv2.imwrite(file_path_save+'\\'+name_holes+'.png', IMG_BACKGROUND_HOLES)
+        IMG_BACKGROUND_HOLES_depthed = add_depth_column(IMG_BACKGROUND_HOLES)
+        np.savetxt(file_path_save+'\\'+name_holes+'.txt', IMG_BACKGROUND_HOLES_depthed, fmt='%.2f', header=f'{name_holes}\n\n', comments='', delimiter='    ')
 
+        ###### 孔洞缝参数保存
         df_background_para_final = df_background_para_adjust_final(df_background_para, window_length=200)
-        # df_background_para.to_csv(file_path_save + '\\' + str(index_save) + '_background_para_origin.csv', index=False)
-        # df_background_para_final.to_csv(file_path_save+'\\'+str(index_save)+'_background_para_processed.csv', index=False)
+        df_background_para.to_csv(file_path_save + '\\' + str(index_save) + '_background_para_origin.csv', index=False)
+        df_background_para_final.to_csv(file_path_save+'\\'+str(index_save)+'_background_para_processed.csv', index=False)
 
-        visualize_well_logs(
-            data=df_background_para,
-            depth_col='depth',
-            curve_cols=cols_cracks+cols_holes,
-        )
-        visualize_well_logs(
-            data=df_background_para_final,
-            depth_col='depth',
-            curve_cols=cols_cracks+cols_holes,
-        )
-        show_Pic([IMG_BACKGROUND_CRACKS, IMG_BACKGROUND_CRACKS_HOLES, IMG_BACKGROUND_HOLES], pic_order='13', figure=(9, 18))
+        # visualize_well_logs(
+        #     data=df_background_para,
+        #     depth_col='depth',
+        #     curve_cols=cols_cracks+cols_holes,
+        # )
+        # visualize_well_logs(
+        #     data=df_background_para_final,
+        #     depth_col='depth',
+        #     curve_cols=cols_cracks+cols_holes,
+        # )
+        # show_Pic([IMG_BACKGROUND_CRACKS, IMG_BACKGROUND_CRACKS_HOLES, IMG_BACKGROUND_HOLES], pic_order='13', figure=(9, 18))

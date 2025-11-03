@@ -132,16 +132,16 @@ def use_pix2pix_gen_FMI(opt):
 
     img_stat_gan_full, img_dyna_gan_full = dataloader_base.combine_pic_list_to_full_fmi(img_gan)
 
-    path_o = opt.dataset_path.replace('simu_cracks', 'simu_FMI')
-    print(path_o)
-    cv2.imwrite(path_o.replace('background_mask', 'fmi_dyna'), (img_dyna_gan_full).astype(np.uint8))
-    cv2.imwrite(path_o.replace('background_mask', 'fmi_stat'), (img_stat_gan_full).astype(np.uint8))
-    img_dyna_gan_full = add_depth_column(img_dyna_gan_full)
-    np.savetxt(path_o.replace('background_mask.png', 'fmi_dyna_simu.txt'), img_dyna_gan_full, comments='', delimiter='    ', fmt='%.2f',
-               header='simu_dyna\n100\n104\nIMAGE.DYNA_SIMU\n\n\n\n')
-    img_stat_gan_full = add_depth_column(img_stat_gan_full)
-    np.savetxt(path_o.replace('background_mask.png', 'fmi_stat_simu.txt'), img_stat_gan_full, comments='', delimiter='    ', fmt='%.2f',
-               header='simu_stat\n100\n104\nIMAGE.STAT_SIMU\n\n\n\n')
+    # path_o = opt.dataset_path.replace('simu_cracks', 'simu_FMI')
+    # print(path_o)
+    # cv2.imwrite(path_o.replace('background_mask', 'fmi_dyna'), (img_dyna_gan_full).astype(np.uint8))
+    # cv2.imwrite(path_o.replace('background_mask', 'fmi_stat'), (img_stat_gan_full).astype(np.uint8))
+    # img_dyna_gan_full = add_depth_column(img_dyna_gan_full)
+    # np.savetxt(path_o.replace('background_mask.png', 'fmi_dyna_simu.txt'), img_dyna_gan_full, comments='', delimiter='    ', fmt='%.2f',
+    #            header='simu_dyna\n100\n104\nIMAGE.DYNA_SIMU\n\n\n\n')
+    # img_stat_gan_full = add_depth_column(img_stat_gan_full)
+    # np.savetxt(path_o.replace('background_mask.png', 'fmi_stat_simu.txt'), img_stat_gan_full, comments='', delimiter='    ', fmt='%.2f',
+    #            header='simu_stat\n100\n104\nIMAGE.STAT_SIMU\n\n\n\n')
 
 
 if __name__ == '__main__':
@@ -151,7 +151,7 @@ if __name__ == '__main__':
     parser.add_argument("--img_size_y", type=int, default=256, help="size of image width")
     parser.add_argument("--channels_in", type=int, default=4, help="number of image channels")
     parser.add_argument("--channels_out", type=int, default=2, help="number of image channels")
-    parser.add_argument("--dataset_path", type=str, default=r"F:\DeepLData\FMI_SIMULATION\simu_cracks_2\9_background_mask.png", help="path of the dataset")
+    parser.add_argument("--dataset_path", type=str, default=r"F:\DeepLData\FMI_SIMULATION\simu_cracks\2_background_mask.png", help="path of the dataset")
     parser.add_argument("--netG", type=str, default=r'D:\GitHub\FMI_CGAN\train_pix2pix_simulate\saved_models\pic2pic\3\best_generator.pth', help="netG path to load")
     parser.add_argument("--batch_size", type=int, default=32, help="size of the batches")
     parser.add_argument("--n_cpu", type=int, default=1, help="num of cpu to process input data")

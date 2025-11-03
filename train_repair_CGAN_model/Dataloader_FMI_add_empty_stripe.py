@@ -4,78 +4,8 @@ import cv2
 import numpy as np
 from torch.utils.data import Dataset
 from src_ele.dir_operation import get_all_file_paths
-from src_ele.pic_opeeration import show_Pic
+from src_ele.pic_opeeration import show_Pic, get_pic_mask_random, pic_rotate_random
 
-
-# 获取随机的方位角曲线，为了接下来的进行图像绕井壁旋转
-def get_random_RB_curve_1(depth, start_angle=None):
-    if start_angle is None:
-        start_angle = np.random.randint(-60, 60)
-
-    max_rotate_angle = 1
-    Rb_random = np.zeros(depth.shape)
-    for i in range(depth.shape[0]):
-        rotate_angle = (np.random.random()-0.5)*max_rotate_angle
-        if i == 0:
-            Rb_random[i][0] = start_angle
-        else:
-            Rb_random[i][0] = max(min(Rb_random[i-1][0] + rotate_angle, 180), -180)
-    return Rb_random
-
-# 根据RB曲线进行图像旋转
-def pic_rotate_by_Rb(pic=np.zeros((10, 10)), Rb=np.zeros((10, 1))):
-    if pic.shape[0] != Rb.shape[0]:
-        print('pic length is not equal to depth length:{}, {}'.format(pic.shape, Rb.shape))
-        exit(0)
-
-    pic_new = np.zeros(pic.shape)
-    temp = 360/pic.shape[1]
-    for i in range(pic.shape[0]):
-        pixel_rotate = int(Rb[i][0] / temp)
-        if pixel_rotate != 0:
-            pic_new[i, pixel_rotate:] = pic[i, :-pixel_rotate]
-            pic_new[i, :pixel_rotate] = pic[i, -pixel_rotate:]
-        else:
-            pic_new[i, :] = pic[i, :]
-
-    return pic_new
-
-# 图像 生成随机RB曲线 并旋转
-def pic_rotate_random(pic=np.zeros((5, 5)), depth=None, ratio=None):
-    if depth is None:
-        depth = np.zeros((pic.shape[0], 1))
-    if ratio is None:
-        ratio = np.random.random()
-
-    if ratio < 0.8:
-        rb_random = get_random_RB_curve_1(depth)
-    else:
-        rb_random = np.zeros((pic.shape[0], 1))
-        return pic, rb_random
-
-    pic_new = pic_rotate_by_Rb(pic, rb_random)
-    return pic_new, rb_random
-
-# 根据空白条带参数config设置，获得随机的图像空白带掩码mask
-def get_pic_mask_random(pic_shape=(256, 256), mask_ratio=0.2, num_belt = np.random.randint(3, 4) * 2):
-    num_mask = int(mask_ratio * pic_shape[-1])      # 256*0.25=64   64像素的空白带
-
-    pix_skip = pic_shape[-1]//num_belt               # 每个极板上 一共256/8=32个像素点
-    mask_belt_width = num_mask//num_belt                 # 每个极板上 一共64/8=8个的空白像素点
-
-    num_belt_para = []                              # 极板空白带配置
-    for i in range(num_belt):
-        index_start = i * pix_skip
-        index_end = i*pix_skip+mask_belt_width
-        num_belt_para.append([index_start, index_end])
-
-    # print('all mask pixel:{}, num belt:{}, pixel per skip:{}, mask width per belt:{}'.format(num_mask, num_belt, pix_skip, mask_belt_width))
-
-    mask = np.ones(pic_shape, dtype='float32')
-    for i in range(len(num_belt_para)):
-        mask[:, num_belt_para[i][0]: num_belt_para[i][1]] = 0
-
-    return mask
 
 # 电成像FMI图像，左右两边指定像素的Padding
 def FMI_padding(image, padding=16):
@@ -410,7 +340,7 @@ class dataloader_FMI_logging_no_repeat(Dataset):
         # 只保留图像修复后的部分 加上 图像原始的已存在的部分，这个是剔除了模型输出的图像不需要修复的部分
         pic_result_target = self.pic_origin_padding*self.mask_padding + pic_result*(1-self.mask_padding)
 
-        # 图像裁剪，才调用来进行辅助恢复的左右两边的padding范围，并进行数值类型改变
+        # 图像裁剪，才调用来进行辅助恢复的左右两边的 padding 范围，并进行数值类型改变
         pic_result = pic_result[:, self.padding:-self.padding].astype(np.uint8)
         pic_result_target = pic_result_target[:, self.padding:-self.padding].astype(np.uint8)
         pic_mask = self.mask_padding[:, self.padding:-self.padding].astype(np.uint8) * 255

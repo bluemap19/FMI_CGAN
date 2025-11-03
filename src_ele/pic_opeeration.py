@@ -8,7 +8,9 @@ import os
 # from skimage.metrics import peak_signal_noise_ratio, structural_similarity
 import math
 from skimage.metrics import peak_signal_noise_ratio, structural_similarity
-from src_ele.file_operation import get_test_ele_data
+from src_ele.file_operation import get_test_ele_data, get_ele_data_from_path, get_random_fmi
+
+
 # import seaborn as sns
 # sns.set()
 
@@ -51,20 +53,15 @@ from src_ele.file_operation import get_test_ele_data
 
 # 图像色度反转
 def traverse_pic(img):
-    img = 255-img
-    return img
+    if np.max(img) < 1.2:
+        return np.clip(1-img, 0, 1)
+    else:
+        return np.clip(255-img, 0, 255)
 
 # 图像二值化
-def binary_pic(pic):
-    max_v = np.max(pic)
-    for i in range(pic.shape[0]):
-        for j in range(pic.shape[1]):
-            if pic[i][j] > (max_v / 2):
-                pic[i][j] = max_v
-            else:
-                pic[i][j] = 0
-
-    return pic
+def binary_pic(pic, threshold):
+    _, mask = cv2.threshold(pic, threshold, 255, cv2.THRESH_BINARY)
+    return mask
 
 # 图像hist获取
 def get_pic_distribute(pic=np.random.randint(1,256,(2,2)), dist_length=9, min_V=0, max_V=256):
@@ -183,39 +180,28 @@ def show_Pic(pic_list, pic_order=None, pic_str=[], path_save='', title='title', 
 
 
 
-
-
-# 图像缩放，输入是Pic_list=[Pic1, Pic2.............]
-def WindowsDataZoomer_PicList(pic_list, ExtremeRatio=0.02, USE_EXTRE=False, Max_V=-1, Min_V=-1):
-    pic_list_numpy = np.array(pic_list)
-    ExtremePointNum = int(pic_list_numpy.size * ExtremeRatio)
-    bigTop = np.max(pic_list_numpy)
-    smallTop = np.min(pic_list_numpy)
-    pic_list_N = copy.deepcopy(pic_list)
+# 图像归一化缩放，输入是图像矩阵pic,主要特点是极值可选择取上下限的数据分布
+def WindowsDataZoomer(pic, ExtremeRatio=0.02, USE_EXTRE=False, Max_V=-1, Min_V=-1):
+    bigTop = np.max(pic)
+    smallTop = np.min(pic)
 
     if USE_EXTRE:
-        bigTop = np.mean(np.sort(pic_list_numpy.reshape(1, -1)[0])[-ExtremePointNum:])
-        smallTop = np.mean(np.sort(pic_list_numpy.reshape(1, -1)[0])[:ExtremePointNum])
+        ExtremePointNum = int(pic.size * ExtremeRatio)
+        bigTop = np.mean(np.sort(pic.reshape(1, -1)[0])[-ExtremePointNum:])
+        smallTop = np.mean(np.sort(pic.reshape(1, -1)[0])[:ExtremePointNum])
 
     if Max_V > 0:
         bigTop = Max_V
+    if Min_V > 0:
         smallTop = Min_V
 
-    if bigTop - smallTop < 0.001:
+    if bigTop - smallTop < 0.0001:
         print("Error........bigTop == smallTop")
         exit(0)
-    Step = 256 / (bigTop - smallTop)
 
-    for n in range(len(pic_list)):
-        for j in range(pic_list[n].shape[0]):
-            for k in range(pic_list[n].shape[1]):
-                pic_list_N[n][j][k] = (pic_list[n][j][k] - smallTop) * Step
-                if pic_list_N[n][j][k] < 0:
-                    pic_list_N[n][j][k] = 0
-                elif pic_list_N[n][j][k] > 255:
-                    pic_list_N[n][j][k] = 255
+    pic_new = np.clip((pic-smallTop)/(bigTop-smallTop), 0, 1).astype(np.float32)
 
-    return pic_list_N, Step, smallTop
+    return pic_new
 
 
 # 数据缩放，把电阻的数据域映射到图像的数据域
@@ -340,7 +326,6 @@ def process_pix(index_x, index_y, input, windows_shape, max_pixel, ratio_top, ra
 
     # 根据窗口index 获得窗口的 数据
     data_windows = copy.deepcopy(input[start_index_x:end_index_x, start_index_y:end_index_y]).ravel()
-
     value = input[index_x][index_y]
 
     # 根据窗口周边数据情况，计算像素移动方向， 正的为 增大，负的为 减小
@@ -400,21 +385,12 @@ def pic_enhence_random(input, windows_shape=3, ratio_top=0.2, ratio_migration=0.
     all_times = input.shape[0] * input.shape[1]
 
     a = list(range(all_times))
-    r = shuffle(a)
-    # print(r)
-
-    # for i in range(all_times):
-    #     x = random.randint(0, input.shape[0]-1)
-    #     y = random.randint(0, input.shape[1]-1)
-    #
-    #     data_new[x][y] = process_pix(x, y, input, windows_shape, max_pixel, ratio_top, ratio_migration)
+    random_index_list = shuffle(a)
 
     for j in range(random_times):
-        for i in r:
-            # print(i)
+        for i in random_index_list:
             x = i // input.shape[1]
             y = i % input.shape[1]
-            # print(i, x, y)
 
             data_new[x][y] = process_pix(x, y, input, windows_shape, max_pixel, ratio_top, ratio_migration)
 
@@ -529,7 +505,11 @@ def test_pic_random_enhance_effect():
 
 
 
-def save_img_data(dep, data, path=''):
+def save_img_data(dep=None, data=None, path=''):
+    if dep is None:
+        dep = np.arange(data.shape[0])
+
+    # assert dep.size == data.shape[0]
     dep = np.reshape(dep, (-1, 1))
     data = np.hstack((dep, data))
 
@@ -575,6 +555,7 @@ def psnr(img1, img2):
    PIXEL_MAX = 1
    return 20 * math.log10(PIXEL_MAX / math.sqrt(mse))
 
+
 # 计算图像信息熵
 def comentropy(img):
     # img = cv2.imread('20201210_3.bmp',0)
@@ -586,9 +567,7 @@ def comentropy(img):
 
     P = hist_cv / (m * n)  # 概率
     E = np.sum([p * np.log2(1 / p) for p in P if p>0])
-
     return E
-
 
 
 # from skimage.metrics import structural_similarity
@@ -803,9 +782,6 @@ def pic_smooth_effect_compare():
 
 
 
-
-
-
 # 对二维数据 进行 简单的数据缩放
 def pic_scale_simple(pic=np.array([]), pic_shape=[0,0]):
     if len(pic.shape) >= 3:
@@ -860,30 +836,10 @@ def pic_repair_normal(pic, windows_l=5):
     PIC_Repair_dst_NS = cv2.inpaint(pic, PicDataWhiteStripe, windows_l, cv2.INPAINT_NS)
 
     return PIC_Repair_dst_TELEA, PIC_Repair_dst_NS, PicDataWhiteStripe
-# pic_new = pic_scale_simple(pic_shape=[0.5, 0.5])
-# print(pic_new)
 
 
 def pic_seg_by_kai_bi():
-    path_in = r'C:\Users\Administrator\Desktop\paper_f\unsupervised_segmentation\fracture\LN11-4_367_5444.3994_5445.0244_dyna.png'
-    # path_in = r'D:\Data\target_stage3_small_p\train\2\LG701-H1_358_5380.5020_5381.1695_dyna.png'
-    path_in = r'D:\Data\target_stage3_small_p\train\1\LG7-4_301_5259.5002_5260.1627_dyna.png'
-    path_in = r'D:\Data\target_stage3_small_p\train\1\LG7-4_132_5171.0002_5171.6427_dyna.png'
-    path_in = r'D:\Data\target_stage3_small_p\train\1\LG701_205_5224.5000_5225.1325_dyna.png'
-    path_in = r'D:\Data\target_stage3_small_p\train\1\LG7-4_129_5169.5002_5170.1252_dyna.png'
-    path_in = r'D:\Data\target_stage3_small_p\train\1\LG7-4_116_5162.0002_5162.6252_dyna.png'
-    path_in = r'D:\Data\target_stage3_small_p\train\1\LG701_189_5215.5000_5216.1725_dyna.png'
-    path_in = r'D:\Data\target_stage3_small_p\train\1\LG701_194_5218.0000_5218.6275_dyna.png'
-    path_in = r'D:\Data\target_stage3_small_p\train\1\LG701-H1_104_5248.0020_5248.6370_dyna.png'
-    path_in = r'D:\Data\target_stage3_small_p\train\1\LG7-4_107_5157.5002_5158.1277_dyna.png'
-    path_in = r'D:\Data\target_stage3_small_p\train\1\LG701-H1_93_5242.5020_5243.1645_dyna.png'
-    path_in = r'D:\Data\target_stage3_small_p\train\1\LG7-4_301_5259.5002_5260.1627_dyna.png'
     path_in = r'D:\Data\target_stage3_small_p\train\1\LG701_126_5183.0000_5183.6600_dyna.png'
-    # path_in = r'D:\Data\target_stage3_small_p\train\2\LG701-H1_241_5320.0020_5320.6595_dyna.png'
-    # path_in = r'D:\Data\target_stage3_small_p\train\2\LG701-H1_250_5324.5020_5325.1645_dyna.png'
-    # path_in = r'D:\Data\target_stage3_small_p\train\2\LG701-H1_249_5324.0020_5324.6745_dyna.png'
-    # path_in = r'D:\Data\target_stage3_small_p\train\2\LG701-H1_148_5271.5020_5272.1295_dyna.png'
-    # path_in = r'D:\Data\target_stage3_small_p\train\2\LG7-4_336_5278.0002_5278.6477_dyna.png'
 
     pic = cv2.imread(path_in, cv2.IMREAD_GRAYSCALE)
     print(pic.shape)
@@ -961,4 +917,309 @@ def cal_pic_generate_effect(pic_org, pic_repair):
     Con_vice = contrast(pic_repair)
 
     return PSNR, SSIM, mse, rmse, mae, r2, Entropy_org, Entropy_vice, Con_org, Con_vice
-# pic_seg_by_kai_bi()
+
+
+
+
+
+
+# 根据空白条带参数config设置，获得随机的图像空白带掩码mask
+def get_pic_mask_random(pic_shape=(256, 256), mask_ratio=0.2, num_belt = np.random.randint(2, 4) * 2):
+    """
+    生成随机的电成像空白条带掩码
+
+    参数:
+    - pic_shape: 目标图像形状 (高度, 宽度)
+    - mask_ratio: 空白区域占总宽度的比例 (0-1)
+    - num_belt: 空白条带数量 (极板数量)，如果为None则随机生成
+
+    返回:
+    - mask: 空白条带掩码，1表示保留区域，0表示空白区域
+
+    算法说明:
+    1. 将图像宽度均匀分配给各个极板
+    2. 在每个极板上创建指定宽度的空白区域
+    3. 生成对应的掩码矩阵
+
+    数据检查点:
+    - 验证输入参数的有效性
+    - 检查生成的掩码形状是否正确
+    - 确认空白区域比例符合预期
+    """
+    # 数据检查1: 验证输入参数
+    if not isinstance(pic_shape, (tuple, list)) or len(pic_shape) != 2:
+        raise ValueError(f"pic_shape应为包含两个元素的元组或列表，当前为: {pic_shape}")
+
+    if not (0 <= mask_ratio <= 1):
+        raise ValueError(f"mask_ratio应在0-1范围内，当前为: {mask_ratio}")
+
+    # 如果未指定极板数量，则随机生成
+    if num_belt is None:
+        num_belt = np.random.randint(2, 4) * 2  # 生成偶数个极板: 4, 6, 8
+
+    # 数据检查2: 验证极板数量有效性
+    if num_belt <= 0 or num_belt > pic_shape[1]:
+        raise ValueError(f"极板数量应在1到图像宽度之间，当前为: {num_belt}, 图像宽度: {pic_shape[1]}")
+
+    num_mask = int(mask_ratio * pic_shape[-1])      # 256*0.25=64   64像素的空白带
+
+    # 数据检查3: 确保空白像素数合理
+    if num_mask <= 0:
+        print(f"警告: 空白像素数为0，mask_ratio可能过小: {mask_ratio}")
+        return np.ones(pic_shape, dtype='float32')
+
+    if num_mask >= pic_shape[1]:
+        print(f"警告: 空白像素数超过图像宽度，将生成全空白掩码")
+        return np.zeros(pic_shape, dtype='float32')
+
+    pix_skip = pic_shape[-1]//num_belt               # 每个极板上 一共256/8=32个像素点
+    mask_belt_width = num_mask//num_belt                 # 每个极板上 一共64/8=8个的空白像素点
+
+    num_belt_para = []                              # 极板空白带配置
+    for i in range(num_belt):
+        index_start = i * pix_skip
+        index_end = i*pix_skip+mask_belt_width
+        num_belt_para.append([index_start, index_end])
+
+    # print('all mask pixel:{}, num belt:{}, pixel per skip:{}, mask width per belt:{}'.format(num_mask, num_belt, pix_skip, mask_belt_width))
+
+    mask = np.ones(pic_shape, dtype='float32')
+    for i in range(len(num_belt_para)):
+        mask[:, num_belt_para[i][0]: num_belt_para[i][1]] = 0
+
+    return mask
+
+
+# 获取随机的方位角曲线，为了接下来的进行图像绕井壁旋转
+def get_random_RB_curve(depth, start_angle=None):
+    """
+        生成随机的方位角(RB)曲线
+
+        参数:
+        - depth: 深度数据，用于确定曲线长度
+        - start_angle: 起始方位角，如果为None则随机生成
+
+        返回:
+        - Rb_random: 随机生成的方位角曲线
+
+        算法说明:
+        1. 从随机起始角度开始
+        2. 在每个深度点进行随机角度变化（受限变化幅度）
+        3. 确保角度在[-180, 180]范围内
+
+        数据检查点:
+        - 验证深度数据有效性
+        - 检查生成的曲线角度范围
+        - 确认曲线长度与深度数据匹配
+    """
+    # 数据检查1: 验证深度数据
+    if depth is None or len(depth) == 0:
+        raise ValueError("深度数据不能为空")
+
+    # 随机生成起始角度（如果未提供）
+    if start_angle is None:
+        start_angle = np.random.randint(-60, 60)
+
+    max_rotate_angle = 1                # 最大单步旋转角度
+    Rb_random = np.zeros(depth.shape)
+    for i in range(depth.shape[0]):
+        # 生成随机旋转角度（-0.5到0.5度）
+        rotate_angle = (np.random.random()-0.5)*max_rotate_angle
+        if i == 0:
+            Rb_random[i][0] = start_angle
+        else:
+            # 计算新角度并限制在[-180, 180]范围内
+            new_angle = Rb_random[i-1][0] + rotate_angle
+            Rb_random[i][0] = max(min(new_angle, 180), -180)
+
+    return Rb_random
+
+# 根据RB曲线进行图像旋转
+def pic_rotate_by_Rb(pic=np.zeros((10, 10)), Rb=np.zeros((10, 1))):
+    """
+        根据方位角曲线旋转图像
+
+        参数:
+        - pic: 输入图像 (高度, 宽度)
+        - Rb: 方位角曲线 (高度, 1)
+
+        返回:
+        - pic_new: 旋转后的图像
+
+        算法说明:
+        1. 将方位角转换为像素位移量
+        2. 对每一行图像进行循环平移
+        3. 实现绕井壁的旋转效果
+
+        数据检查点:
+        - 验证图像和方位角曲线尺寸匹配
+        - 检查旋转后的图像数据完整性
+        - 确认旋转操作不会丢失图像信息
+    """
+    # 数据检查1: 验证输入数据形状匹配
+    if pic.shape[0] != Rb.shape[0]:
+        error_msg = f"图像行数 {pic.shape[0]} 与方位角曲线长度 {Rb.shape[0]} 不匹配"
+        print(f"错误: {error_msg}")
+        raise ValueError(error_msg)
+
+    # 数据检查2: 验证图像和方位角数据有效性
+    if pic.size == 0 or Rb.size == 0:
+        print("警告: 输入图像或方位角曲线为空")
+        return pic.copy() if pic.size > 0 else pic
+
+    # 创建输出图像
+    pic_new = np.zeros(pic.shape)
+    temp = 360/pic.shape[1]         # 每个像素对应的角度
+    # 对每一行应用旋转
+    for i in range(pic.shape[0]):
+        # 计算像素位移量（四舍五入到最近的整数）
+        pixel_rotate = int(round(Rb[i][0] / temp))
+
+        # 数据检查3: 验证旋转像素数合理性
+        if abs(pixel_rotate) > pic.shape[1]:
+            print(f"警告: 行 {i} 的旋转像素数 {pixel_rotate} 过大，图像宽度: {pic.shape[1]}")
+            pixel_rotate = pixel_rotate % pic.shape[1]  # 取模限制在合理范围
+
+        # 应用循环平移
+        if pixel_rotate != 0:
+            pic_new[i, pixel_rotate:] = pic[i, :-pixel_rotate]
+            pic_new[i, :pixel_rotate] = pic[i, -pixel_rotate:]
+        else:
+            pic_new[i, :] = pic[i, :]
+
+    return pic_new
+
+# 图像 生成随机RB曲线 并旋转
+def pic_rotate_random(pic=np.zeros((5, 5)), depth=None, ratio=None):
+    """
+        随机旋转图像
+
+        参数:
+        - pic: 输入图像
+        - depth: 深度数据（用于生成方位角曲线）
+        - ratio: 旋转概率，如果为None则随机生成
+
+        返回:
+        - pic_new: 旋转后的图像（可能与原图相同）
+        - rb_random: 使用的方位角曲线
+
+        数据检查点:
+        - 验证输入图像有效性
+        - 检查深度数据与图像匹配
+        - 确认旋转操作的正确性
+    """
+    # 数据检查1: 验证输入图像
+    if pic is None or pic.size == 0:
+        print("警告: 输入图像为空")
+        return pic, np.zeros((0, 1)) if depth is None else np.zeros_like(depth)
+
+    # 处理默认参数
+    if depth is None:
+        depth = np.zeros((pic.shape[0], 1))
+    if ratio is None:
+        ratio = np.random.random()
+
+    # 数据检查2: 验证深度数据与图像行数匹配
+    if depth.shape[0] != pic.shape[0]:
+        print(f"警告: 深度数据长度 {depth.shape[0]} 与图像行数 {pic.shape[0]} 不匹配")
+        # 调整深度数据长度
+        if depth.shape[0] > pic.shape[0]:
+            depth = depth[:pic.shape[0]]
+        else:
+            depth = np.pad(depth, ((0, pic.shape[0] - depth.shape[0]), (0, 0)), mode='edge')
+
+    # 根据概率决定是否旋转
+    if ratio < 0.8:
+        rb_random = get_random_RB_curve(depth)
+        pic_new = pic_rotate_by_Rb(pic, rb_random)
+    else:
+        rb_random = np.zeros((pic.shape[0], 1))
+        pic_new = pic.copy()  # 创建副本，避免修改原图
+
+    pic_new = pic_rotate_by_Rb(pic, rb_random)
+    return pic_new, rb_random
+
+
+# 输入图像list，但是这些图像的形状必须完全一样，否则行不通，并对图像进行添加随机的mask操作
+def pic_list_add_random_stripe(image_list):
+    """
+        为图像列表添加随机空白条带
+
+        参数:
+        - image_list: 图像列表，所有图像必须具有相同形状
+
+        返回:
+        - masked_list: 添加空白条带后的图像列表
+        - mask_list: 空白条带掩码列表
+
+        数据检查点:
+        - 验证输入图像列表有效性
+        - 检查所有图像形状一致性
+        - 确认生成的掩码有效性
+        - 验证处理后的图像数据完整性
+    """
+    # 数据检查1: 验证输入参数
+    if not image_list or len(image_list) == 0:
+        print("警告: 图像列表为空")
+        return [], []
+
+    # 检查所有图像形状是否一致
+    image_shape_list = []
+    for i, image in enumerate(image_list):
+        if image is None:
+            print(f"错误: 图像列表中的第 {i} 个元素为None")
+            return [], []
+        image_shape_list.append(image.shape)
+
+    # 数据检查2: 验证所有图像形状一致
+    if len(set(image_shape_list)) > 1:
+        print(f"警告: 图像形状不一致: {image_shape_list}")
+        raise ValueError("图像形状不一致")
+        # 这里可以添加图像调整逻辑或抛出异常
+
+    first_image_shape = image_list[0].shape
+
+    # 空白率设置
+    ratio_empty = np.random.choice([0.25, 0.3, 0.3, 0.35, 0.35, 0.4, 0.4, 0.45, 0.45])
+    # 极板个数设置
+    num_belt = np.random.choice([6, 6, 6, 8, 8, 10])
+    # 生成空白条带的掩码图像， [0, 1]
+    mask = get_pic_mask_random(pic_shape=first_image_shape, mask_ratio=ratio_empty, num_belt=num_belt)
+
+    # 数据检查4: 验证生成的掩码
+    if mask is None or mask.shape != first_image_shape:
+        print(f"错误: 生成的掩码形状 {mask.shape if mask is not None else 'None'} 与预期 {first_image_shape} 不匹配")
+        # 创建默认掩码（全1）
+        mask = np.ones(first_image_shape, dtype='float32')
+
+    # 空白条带掩码图像的随机绕井壁旋转,对掩码进行随机旋转
+    mask, rb_random = pic_rotate_random(mask)
+
+    masked_list = []
+    mask_list = []
+    for i, image in enumerate(image_list):
+        # 数据检查6: 验证单个图像
+        if image is None:
+            print(f"警告: 第 {i} 个图像为None，跳过处理")
+            masked_list.append(None)
+            mask_list.append(None)
+            continue
+
+        if image.shape != first_image_shape:
+            print(f"警告: 第 {i} 个图像形状 {image.shape} 与第一个图像 {first_image_shape} 不一致")
+            # 这里可以添加图像调整逻辑
+
+        # 这个是图像被遮盖后的图像 # 应用掩码：保留区域 = 原图 × 掩码
+        image_masked = mask * image
+        # 这个是图像遮盖的部分    # 空白区域 = 原图 × (1 - 掩码)
+        image_mask = (1 - mask) * image
+        masked_list.append(image_masked)
+        mask_list.append(image_mask)
+
+    return masked_list, mask_list
+
+if __name__ == '__main__':
+    dyna_data, stat_data, depth = get_random_fmi()
+
+    dyna_stripe_list, image_mask_list = pic_list_add_random_stripe([dyna_data])
+    show_Pic([dyna_data, dyna_stripe_list[0], image_mask_list[0]])

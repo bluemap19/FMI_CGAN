@@ -3,3 +3,8 @@
 /train_repair_CGAN_model/images/
 /train_pix2pix_simulate/images/
 /train_pix2pix_simulate/saved_models/
+/FMI_Para_calucate/window_length200/
+/FMI_Para_calucate/window_length400/
+/FMI_Para_calucate/window_length400-VIT/
+/FMI_Para_calucate/windows400-4step-trained/
+/FMI_Para_calucate/windows400-parashead-prompt/

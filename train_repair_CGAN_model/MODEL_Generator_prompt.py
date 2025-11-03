@@ -181,31 +181,31 @@ if __name__ == '__main__':
     output = gen(input_tensor)
     print("输出范围:", output.min().item(), output.max().item())
 
-    # # 创建改进后的生成器
-    # gen = GeneratorUNetImproved(in_channels=2, out_channels=2).to(device)
-    #
-    # # 计算参数量
-    # total_params = sum(p.numel() for p in gen.parameters())
-    # trainable_params = sum(p.numel() for p in gen.parameters() if p.requires_grad)
-    # print(f"总参数量: {total_params / 1e6:.2f}M")
-    # print(f"可训练参数量: {trainable_params / 1e6:.2f}M")
-    #
-    # # 测试输入输出
-    # input_tensor = torch.randn((3, 2, 256, 256)).to(device)
-    # output = gen(input_tensor)
-    # print(f"输入形状: {input_tensor.shape}, 输出形状: {output.shape}")
-    #
-    # # 测试前向传播速度
-    # import time
-    #
-    # start_time = time.time()
-    # for _ in range(10):
-    #     _ = gen(input_tensor)
-    # elapsed_time = time.time() - start_time
-    # print(f"10次前向传播耗时: {elapsed_time:.4f}秒")
-    # print(f"平均每次前向传播耗时: {elapsed_time / 10:.4f}秒")
-    #
-    # # 测试梯度反向传播
-    # loss = torch.mean(output)
-    # loss.backward()
-    # print("梯度反向传播测试成功")
+    # 创建改进后的生成器
+    gen = GeneratorUNetImproved(in_channels=2, out_channels=2).to(device)
+
+    # 计算参数量
+    total_params = sum(p.numel() for p in gen.parameters())
+    trainable_params = sum(p.numel() for p in gen.parameters() if p.requires_grad)
+    print(f"总参数量: {total_params / 1e6:.2f}M")
+    print(f"可训练参数量: {trainable_params / 1e6:.2f}M")
+
+    # 测试输入输出
+    input_tensor = torch.randn((3, 2, 256, 256)).to(device)
+    output = gen(input_tensor)
+    print(f"输入形状: {input_tensor.shape}, 输出形状: {output.shape}")
+
+    # 测试前向传播速度
+    import time
+
+    start_time = time.time()
+    for _ in range(10):
+        _ = gen(input_tensor)
+    elapsed_time = time.time() - start_time
+    print(f"10次前向传播耗时: {elapsed_time:.4f}秒")
+    print(f"平均每次前向传播耗时: {elapsed_time / 10:.4f}秒")
+
+    # 测试梯度反向传播
+    loss = torch.mean(output)
+    loss.backward()
+    print("梯度反向传播测试成功")

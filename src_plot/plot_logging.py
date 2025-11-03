@@ -16,15 +16,12 @@ def visualize_well_logs(data: pd.DataFrame,
                         curve_cols: list = ['L1', 'L2', 'L3', 'L4'],
                         type_cols: list = [],
                         figsize: tuple = (12, 10),
-                        colors: list = ['#FF0000', '#00FF00', '#0000FF', '#00FFFF',
-                                        '#FF00FF', '#8000FF', '#00FF80', '#FF0080',
-                                        '#FFA500', '#FFFF00'],
-                        range_limits = [],
+                        colors: list = ['#FF0000', '#00FF00', '#0000FF', '#00FFFF', '#FF00FF', '#8000FF', '#00FF80', '#FF0080', '#FFA500', '#FFFF00'],
+                        range_limits=[],
                         legend_dict: dict = {},
                         figure=None):
     """
     测井数据可视化接口 - 交互功能优化版
-
     功能变更：
     - 鼠标滚轮：调整深度位置（上下滚动）
     - 滑动条：调整窗口大小（视野范围）
@@ -198,7 +195,7 @@ def visualize_well_logs(data: pd.DataFrame,
                     min_temp = data[col].min()
                     max_temp = data[col].max()
 
-                if abs(min_temp - max_temp) < 0.01:
+                if abs(min_temp - max_temp) < 0.00000001:
                     min_temp -= 1
                     max_temp += 1
             ax.set_xlim(min_temp, max_temp)

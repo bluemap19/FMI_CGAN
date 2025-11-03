@@ -696,7 +696,7 @@ class ImageDataset_FMI_SPLIT_NO_REPEAT(Dataset):
 
         img_dyna_fmi = img_dyna_fmi*255
         img_stat_adjust = img_stat_adjust*255
-        # show_Pic([1-img_dyna_gan_full, 1-img_stat_gan_full, 1-img_stat_adjust, 1-img_dyna_fmi], pic_order='14', figure=(8, 10))
+        show_Pic([1-img_dyna_gan_full, 1-img_stat_gan_full, self.mask_stat, self.mask_dyna, 255-img_stat_adjust, 255-img_dyna_fmi], pic_order='16', figure=(6, 12))
         return img_stat_adjust, img_dyna_fmi
 
 
