@@ -398,10 +398,10 @@ class cracks_simulation(object):
         IMG_background = np.zeros((height_background, width_background), dtype=np.uint8)
         list_configs = []
 
-        if parallel_cracks:
-            print('生成随机平行多缝地层')
-        else:
-            print('生成随机交叉多缝地层')
+        # if parallel_cracks:
+        #     print('生成随机平行多缝地层')
+        # else:
+        #     print('生成随机交叉多缝地层')
 
         # 裂缝配置信息的随机生成
         for i in range(NUM_Fractures_per_img):
@@ -434,7 +434,7 @@ class cracks_simulation(object):
                     # (3缝的最后一个裂缝，可以添加成为水平缝)
                     parallel_fracture_flag = random.choice([True, False])
                     if parallel_fracture_flag:
-                        print('生成随机水平第三缝！！！！！！！！')
+                        # print('生成随机水平第三缝！！！！！！！！')
                         height_draw_t = int(random.randint(26, 46) * (0.8 + random.random() * 0.4))
                         crack_width_t = random.randint(160, 190)
                         noise_level_t = (crack_width_t/300 + 96/height_draw_t)*0.5

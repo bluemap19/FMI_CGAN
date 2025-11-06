@@ -20,7 +20,8 @@ if __name__ == '__main__':
     print(opt)
 
 
-    path_target_folder = r'F:\DeepLData\FMI_SIMULATION\simu_cracks'
+    # path_target_folder = r'F:\DeepLData\FMI_SIMULATION\simu_cracks'
+    path_target_folder = r'F:\DeepLData\FMI_SIMULATION\simu_cracks_3'
     list_all_file = get_all_file_paths(path_target_folder)
     print(list_all_file)
     for file_name in list_all_file:

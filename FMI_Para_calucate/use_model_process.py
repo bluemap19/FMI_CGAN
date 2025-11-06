@@ -184,8 +184,8 @@ def main(args):
     paras_path = os.path.join(args.path_output_dir, file_name.replace('.png', '_params.csv'))
     cracks_txt_path = os.path.join(args.path_output_dir, file_name.replace('dyna.png', '_cracks_mask.txt'))
     holes_txt_path = os.path.join(args.path_output_dir, file_name.replace('dyna.png', '_holes_mask.txt'))
-    cracks_origin_txt_path = os.path.join(args.path_output_dir, file_name.replace('dyna.png', '_cracks_mask.txt'))
-    holes_origin_txt_path = os.path.join(args.path_output_dir, file_name.replace('dyna.png', '_holes_mask.txt'))
+    cracks_origin_txt_path = os.path.join(args.path_output_dir, file_name.replace('dyna.png', '_cracks_mask_origin.txt'))
+    holes_origin_txt_path = os.path.join(args.path_output_dir, file_name.replace('dyna.png', '_holes_mask_origin.txt'))
     dyna_txt_path = os.path.join(args.path_output_dir, file_name.replace('dyna.png', '_dyna_origin.txt'))
     stat_txt_path = os.path.join(args.path_output_dir, file_name.replace('dyna.png', '_stat_origin.txt'))
 
@@ -209,7 +209,7 @@ if __name__ == '__main__':
     # 模型参数
     # parser.add_argument('--checkpoint_path', type=str, default=r'D:\GitHub\FMI_CGAN\FMI_Para_calucate\windows400-2\checkpoints\checkpoint_epoch_0020.pth', help='模型检查点路径')
     # parser.add_argument('--checkpoint_path', type=str, default=r'D:\GitHub\FMI_CGAN\FMI_Para_calucate\windows400-parashead-prompt\checkpoints\checkpoint_epoch_0020.pth', help='模型检查点路径')
-    parser.add_argument('--checkpoint_path', type=str, default=r'D:\GitHub\FMI_CGAN\FMI_Para_calucate\windows400-4step-trained\checkpoints\checkpoint_epoch_0013.pth', help='模型检查点路径')
+    parser.add_argument('--checkpoint_path', type=str, default=r'D:\GitHub\FMI_CGAN\FMI_Para_calucate\windows400-data-range-enhenced2\checkpoints\checkpoint_epoch_0013.pth', help='模型检查点路径')
     parser.add_argument('--in_channels', type=int, default=2, help='输入通道数（动态+静态图像）')
     parser.add_argument('--out_channels', type=int, default=2, help='输出通道数（裂缝+孔洞掩码）')
     parser.add_argument('--num_params', type=int, default=7, help='参数数量')

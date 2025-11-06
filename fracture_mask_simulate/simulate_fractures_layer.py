@@ -2,6 +2,7 @@ import random
 import cv2
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 
 from fracture_mask_simulate.cracks_simulation import cracks_simulation
 from fracture_mask_simulate.holes_simulation import holes_simulation
@@ -132,6 +133,8 @@ def add_depth_column(image_FMI):
 
 
 if __name__ == '__main__':
+    # 模拟裂缝、孔洞的mask图像数据
+
     CS = cracks_simulation()
     # # 背景初始化
     # BASE_BACKGROUND = np.zeros((512, 256), dtype=np.uint8)
@@ -164,8 +167,8 @@ if __name__ == '__main__':
     #     IMG_LIST.append(block_image)
     # show_Pic(IMG_LIST, pic_order='36', figure=(20, 10))
 
-    for i in range(100):
-        IMG_BACKGROUND_CRACKS = np.zeros((10000, 256), dtype=np.uint8)
+    for i in tqdm(range(200)):
+        IMG_BACKGROUND_CRACKS = np.zeros((20000, 256), dtype=np.uint8)
 
         # 存放9个孔洞缝参数，分别是 裂缝密度、裂缝张开度、裂缝长度、裂缝有效面积、面孔率、孔洞密度、孔洞面积
         # 'crack_length', 'crack_width', 'crack_area', 'crack_angle', 'crack_inclination', 'crack_density', 'hole_area', 'hole_density', 'hole_area_ratio'
@@ -208,7 +211,7 @@ if __name__ == '__main__':
             # 裂缝与裂缝之间，随机的间隔， 50*0.0025 或者是 600*0.0025
             end_index += random.randint(50, 600)
 
-        vug_num_p = np.random.randint(IMG_BACKGROUND_CRACKS.shape[0] // 100, IMG_BACKGROUND_CRACKS.shape[0] // 100 * 10)
+        vug_num_p = np.random.randint(IMG_BACKGROUND_CRACKS.shape[0] // 800, IMG_BACKGROUND_CRACKS.shape[0] // 400 * 30)
         # 添加随机的地层孔洞信息
         IMG_BACKGROUND_CRACKS_HOLES, holes_location, df_hole_para = HS.add_vugs_random(IMG_BACKGROUND_CRACKS, vug_num_p=vug_num_p, ratio_repetition=0.05, vugs_shape_configuration=[[2, 40], [2, 40]])
 

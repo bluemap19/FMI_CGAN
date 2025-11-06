@@ -48,8 +48,8 @@ def save_checkpoint(model, optimizer, epoch, loss, checkpoint_dir, is_best=False
     checkpoint = {
         'epoch': epoch,
         'model_state_dict': model.state_dict(),
-        'optimizer_state_dict': optimizer.state_dict(),
-        'loss': loss,
+        # 'optimizer_state_dict': optimizer.state_dict(),   # 这两个所需要消耗的空间太大了，只能给注释掉了
+        # 'loss': loss,                                     # 这两个所需要消耗的空间太大了，只能给注释掉了
         'timestamp': datetime.now().isoformat()
     }
 
@@ -267,10 +267,11 @@ def main():
     parser = argparse.ArgumentParser(description='电成像多任务UNet模型训练')
 
     # 数据参数
-    parser.add_argument('--train_data_dir', type=str, default=r'F:\DeepLData\FMI_SIMULATION\simu_FMI_2', help='训练数据目录')
+    # parser.add_argument('--train_data_dir', type=str, default=r'F:\DeepLData\FMI_SIMULATION\simu_FMI_2', help='训练数据目录')
+    parser.add_argument('--train_data_dir', type=str, default=r'F:\DeepLData\FMI_SIMULATION\simu_FMI_3', help='训练数据目录')
     parser.add_argument('--val_data_dir', type=str, default=r'F:\DeepLData\FMI_SIMULATION\simu_FMI', help='验证数据目录')
     parser.add_argument('--data_iter_windows_length', type=int, default=400, help='数据处理的窗长大小')
-    parser.add_argument('--batch_size', type=int, default=48, help='批处理大小')
+    parser.add_argument('--batch_size', type=int, default=52, help='批处理大小')
     parser.add_argument('--image_length', type=int, default=160, help='批处理大小')
     parser.add_argument('--num_workers', type=int, default=1, help='数据加载工作线程数')
 

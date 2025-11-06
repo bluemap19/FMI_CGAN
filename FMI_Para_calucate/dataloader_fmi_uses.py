@@ -148,10 +148,14 @@ class dataloader_fmi_seg(Dataset):
         """
 
         # 计算全局统计量
-        self.global_param_means = np.array([0.6221, 0.0904, 0.0815, 0.5685, 0.0546, 11.1021, 0.000754])
-        self.global_param_stds = np.array([0.5950, 0.0752, 0.1270, 0.6751, 0.0253, 4.2401, 0.03280])
-        self.global_param_mins = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-        self.global_param_maxs = np.array([3.6356, 0.5822, 2.0849, 3.0, 0.1931, 32.0, 0.2637509])
+        # self.global_param_means = np.array([0.6221, 0.0904, 0.0815, 0.5685, 0.0546, 11.1021, 0.000754])
+        # self.global_param_stds = np.array([0.5950, 0.0752, 0.1270, 0.6751, 0.0253, 4.2401, 0.03280])
+        # self.global_param_mins = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        # self.global_param_maxs = np.array([3.6356, 0.5822, 2.0849, 3.0, 0.1931, 32.0, 0.2637509])
+        self.global_param_means = np.array([0.647133, 0.09096, 0.102039, 0.848195, 0.039036, 7.733515, 0.002664])
+        self.global_param_stds = np.array([0.627959, 0.094842, 0.160714, 0.781702, 0.027156, 4.829096, 0.001792])
+        self.global_param_mins = np.array([0, 0, 0, 0, 0, 0, 0])
+        self.global_param_maxs = np.array([3.893162, 0.632009, 2.202867, 3, 0.186791, 32, 0.012173])
 
     def normalize_parameters(self, params):
         """ 使用全局统计信息归一化参数 """

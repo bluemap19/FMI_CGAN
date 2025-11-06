@@ -441,10 +441,10 @@ if __name__ == '__main__':
 
     # 初始化数据加载器
     data_loader = dataloader_FMI_logging(
-        path_folder=r'F:\DeepLData\FMI_SIMULATION\simu_FMI_2',
-        # path_folder=r'F:\DeepLData\FMI_SIMULATION\simu_FMI',
+        # path_folder=r'F:\DeepLData\FMI_SIMULATION\simu_FMI_2',
+        path_folder=r'F:\DeepLData\FMI_SIMULATION\simu_FMI_3',
         len_windows=400,
-        step_windows=50,
+        step_windows=200,
         normalize_params=True,
         normalization_method='minmax',
     )
