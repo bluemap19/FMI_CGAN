@@ -4,13 +4,14 @@ import cv2
 import numpy as np
 from torch.utils.data import Dataset
 from src_ele.dir_operation import get_all_file_paths
+from src_ele.file_operation import get_ele_data_from_path
 from src_ele.pic_opeeration import show_Pic, get_pic_mask_random, pic_rotate_random
 
 
 # 电成像FMI图像，左右两边指定像素的Padding
 def FMI_padding(image, padding=16):
     image_n = np.zeros((image.shape[0], image.shape[1]+2*padding), dtype=np.uint8)
-    image_n[:, padding: -padding] = image
+    image_n[:, padding: -padding] = np.clip(image, 0, 255)
     image_n[:, :padding] = image[:, -padding:]
     image_n[:, -padding:] = image[:, :padding]
     return image_n
@@ -138,6 +139,7 @@ class dataloader_padding_striped(Dataset):
             "real_deduction": dummy_img
         }
 
+
 # 用来进行图像修复的dataloader，使用模型进行修复时，使用此dataloader
 class dataloader_FMI_logging(Dataset):
     def __init__(self, path=r'F:\DeepLData\FMI_SIMULATION\simu_FMI\0_fmi_dyna.png', padding=16, len_windows=256, step_windows=10, pic_length_target=128, mask_config={'ratio_empty':0.2, 'num_belt':6}):
@@ -255,7 +257,7 @@ class dataloader_FMI_logging(Dataset):
         return pic_result, pic_result_target
 
 
-# 用来进行图像修复的dataloader，使用模型进行修复时，使用此dataloader，这个相比较而言更加简便高效
+# 用来进行图像修复的dataloader，使用模型进行修复时，使用此dataloader，这个相比较而言更加简便高效，没有进行重复的图像修复，好处是速度更快且Style更好，坏处是，图像之间的接口处可能存在连接的痕迹
 class dataloader_FMI_logging_no_repeat(Dataset):
     def __init__(self, path=r'F:\DeepLData\FMI_SIMULATION\simu_FMI\0_fmi_dyna.png', padding=16, len_windows=256, pic_length_target=128, mask_config={'ratio_empty':0.2, 'num_belt':6}):
         super().__init__()
@@ -327,7 +329,7 @@ class dataloader_FMI_logging_no_repeat(Dataset):
         """
         pic_result = np.zeros_like(self.pic_origin_padding, dtype=np.float32)   # 结果保存数据
 
-        # 图像加权拼接
+        # 图像拼接
         for index in range(pic_array_list.shape[0]):
             image_t = pic_array_list[index, 0, :, :]
             image_resize = cv2.resize(image_t, self.pic_shape_windows_org)
@@ -356,6 +358,119 @@ class dataloader_FMI_logging_no_repeat(Dataset):
         return pic_result, pic_result_target
 
 
+# 用来进行图像修复的 dataloader，使用模型进行修复时，使用此dataloader，这个相比较而言更加简便高效，没有进行重复的图像修复，好处是速度更快且Style更好，坏处是，图像之间的接口处可能存在连接的痕迹，这个输入的图像是真实的电成像测井图像，不是模拟的，所以需要设置空白带的阈值范围
+class dataloader_FMI_real_no_repeat(Dataset):
+    def __init__(self, path=r'F:\logging_workspace\FY1-15\丰页1-15HF_DYNA_ORIGIN_TEST.txt', padding=16, len_windows=200, pic_length_target=128, mask_config={'empty_pix':-99999.0}):
+        super().__init__()
+        """
+        path:输入的文件路径
+        padding:左右两边padding长度大小
+        len_windows:图像分割的窗长大小
+        pic_length_target:图像输出的窗长大小
+        mask_config:掩码配置，主要是设置掩码都是哪些pix大小，一般是小于这个数是掩码
+        """
+        self.pic_origin, self.depth_data = get_ele_data_from_path(path)
+
+        # print(self.pic_origin.shape, self.depth_data.shape, self.depth_data)
+
+        mask = self.cal_mask(self.pic_origin, mask_config)
+        # print(self.pic_origin.min(), self.pic_origin.max())
+
+        self.pic_origin_padding = FMI_padding(self.pic_origin, padding)     # 图像加padding，用来进行辅助修复
+        self.mask_padding = FMI_padding(mask, padding)
+        self.len_windows = len_windows                                      # 图像遍历窗口长度设置
+        self.length_target = pic_length_target                              # 输出图像边长，方形的
+        self.pic_shape_target = (pic_length_target, pic_length_target)      # 输出图像形状
+        self.length = math.ceil(self.pic_origin.shape[0]//len_windows)       # 数据集的长度
+        self.pic_shape_windows_org = (self.pic_origin_padding.shape[1], len_windows)        # 原始的窗口图像形状
+        self.padding = padding                                              # 左右padding length 设置
+        self.pic_masked_padding = self.pic_origin_padding * self.mask_padding
+
+        # show_Pic([self.pic_origin, self.pic_origin_padding, self.mask_padding, self.pic_masked_padding], pic_order='14')
+        # print((self.pic_origin_padding.min(), self.pic_origin_padding.max()))
+
+    def __getitem__(self, index):
+        image_masked = self.pic_masked_padding[index*self.len_windows:(index+1)*self.len_windows, :]
+        image_origin = self.pic_origin[index*self.len_windows:(index+1)*self.len_windows, :]
+        image_mask = self.mask_padding[index*self.len_windows:(index+1)*self.len_windows, :]
+
+        # 形状变换
+        image_masked = cv2.resize(image_masked, self.pic_shape_target)
+        image_origin = cv2.resize(image_origin, self.pic_shape_target)
+        image_mask = cv2.resize(image_mask, self.pic_shape_target)
+
+        # 转换为 float32 并归一化
+        image_masked = image_masked.astype(np.float32)/255.0
+        image_origin = image_origin.astype(np.float32)/255.0
+        image_mask = image_mask.astype(np.float32)
+
+        # 确保所有图像都有通道维度
+        if image_masked.ndim == 2:  # 如果是二维灰度图
+            image_masked = np.expand_dims(image_masked, axis=0)  # 添加通道维度
+        if image_origin.ndim == 2:
+            image_origin = np.expand_dims(image_origin, axis=0)
+        if image_mask.ndim == 2:
+            image_mask = np.expand_dims(image_mask, axis=0)
+        return {'img_masked':image_masked, 'img_origin':image_origin, 'img_mask':1-image_mask}
+
+    def __len__(self):
+        return self.length
+
+    # 把修复后的图像进行合并成与输入图像一样的图像格式、形状
+    def combine_pic_list(self, pic_array_list, path_target_folder='', str_charter='SIMU_1'):
+        """
+        pic_array_list: array1.shape=[357,1,128,128] ----> 1000*256
+        """
+        pic_result = np.zeros_like(self.pic_origin_padding, dtype=np.float32)   # 结果保存数据
+
+        # 图像拼接
+        for index in range(pic_array_list.shape[0]):
+            image_t = pic_array_list[index, 0, :, :]
+            image_resize = cv2.resize(image_t, self.pic_shape_windows_org)
+            pic_result[index*self.len_windows:(index+1)*self.len_windows] = image_resize
+            # show_Pic([image_resize, image_t])
+
+        # 图像的权重剔除，并进行图像阈值恢复，将图像缩放到0-255范围内
+        pic_result = pic_result*255
+
+        # 只保留图像修复后的部分 加上 图像原始的已存在的部分，这个是剔除了模型输出的图像不需要修复的部分
+        pic_result_target = self.pic_origin_padding*self.mask_padding + pic_result*(1-self.mask_padding)
+
+        # 图像裁剪，调用来进行辅助恢复的左右两边的 padding 范围，并进行数值类型改变
+        pic_result = pic_result[:, self.padding:-self.padding].astype(np.uint8)
+        pic_result_target = pic_result_target[:, self.padding:-self.padding].astype(np.uint8)
+        pic_mask = self.mask_padding[:, self.padding:-self.padding].astype(np.uint8) * 255
+
+        pic_result = np.clip(pic_result, 0, 255)
+        pic_result_target = np.clip(pic_result_target, 0, 255)
+
+        # show_Pic([255-self.mask_padding, 255-pic_result, 255-pic_result_target])
+
+        # 图像保存
+        if len(path_target_folder) > 0:
+            print('path_save:{}'.format(path_target_folder))
+            # cv2.imwrite(path_target_folder+'\\{}_target_result.png'.format(str_charter), pic_result_target)
+            # cv2.imwrite(path_target_folder+'\\{}_model_result.png'.format(str_charter), pic_result)
+            # cv2.imwrite(path_target_folder+'\\{}_mask.png'.format(str_charter), pic_mask)
+
+            pic_result_target_txt = np.hstack((self.depth_data, pic_result_target.astype(np.float32)))
+            np.savetxt(path_target_folder+'\\{}_target_result.txt'.format(str_charter), pic_result_target_txt, fmt='%.6f', delimiter='\t', newline='\n', header=str_charter)
+            pic_result_txt = np.hstack((self.depth_data, pic_result.astype(np.float32)))
+            np.savetxt(path_target_folder+'\\{}_model_result.txt'.format(str_charter), pic_result_txt, fmt='%.6f', delimiter='\t', newline='\n', header=str_charter)
+            pic_mask_txt = np.hstack((self.depth_data, pic_mask.astype(np.float32)))
+            np.savetxt(path_target_folder+'\\{}_mask.txt'.format(str_charter), pic_mask_txt, fmt='%.6f', delimiter='\t', newline='\n', header=str_charter)
+
+        return pic_result, pic_result_target
+
+    def cal_mask(self, pic_origin, mask_config):
+
+        empty_pix = mask_config['empty_pix']
+
+        # 使用向量化操作，大于阈值的设为1，否则为0
+        mask = (pic_origin > empty_pix+10).astype(np.uint8)
+        return mask
+
+
 
 if __name__ == '__main__':
     # a = dataloader_padding_striped(len_pic=128)
@@ -367,9 +482,17 @@ if __name__ == '__main__':
     #     print(np.max(b), np.max(c), np.max(d), np.max(e))
     #     show_Pic([b, c, d, e], pic_order='22')
 
-    dFl = dataloader_FMI_logging()
+    # dFl = dataloader_FMI_logging()
+    # for i in range(10):
+    #     img_list = dFl[i]
+    #     b, c, d = img_list['img_masked'], img_list['img_origin'], img_list['img_mask']
+    #     print(b.shape, c.shape, d.shape)
+    #     show_Pic([b[0, :, :], c[0, :, :], d[0, :, :]])
+
+    dfl = dataloader_FMI_real_no_repeat()
+    print(dfl.__len__())
     for i in range(10):
-        img_list = dFl[i]
+        img_list = dfl[i]
         b, c, d = img_list['img_masked'], img_list['img_origin'], img_list['img_mask']
         print(b.shape, c.shape, d.shape)
         show_Pic([b[0, :, :], c[0, :, :], d[0, :, :]])

@@ -300,6 +300,14 @@ def fmi_data_save(fmi_image, depth_config=None, path_save=r''):
             return False
         depth_data = depth_config.reshape(-1, 1)  # 确保为列向量
         print(f"使用自定义深度序列: {depth_data[0, 0]} 到 {depth_data[-1, 0]}")
+    elif isinstance(depth_config, pd.DataFrame):
+        if depth_config.shape[0] != fmi_image.shape[0]:
+            print(f"错误: 深度数据行数 {depth_config.shape[0]} 与图像行数 {fmi_image.shape[0]} 不匹配")
+            return False
+        depth_data = depth_config[depth_config.columns[0]].values
+        depth_data = depth_data.reshape(-1, 1)  # 确保为列向量
+        print(f"使用自定义深度序列: {depth_data[0, 0]} 到 {depth_data[-1, 0]}")
+
 
     # ============================================================================
     # 3. 数据合并和预处理

@@ -10,10 +10,10 @@ from torch.autograd import Variable
 import torch
 from src_ele.pic_opeeration import show_Pic
 from train_pix2pix_simulate.ssim_geo import GeologicalSSIM
-from train_repair_CGAN_model.Dataloader_FMI_add_empty_stripe import dataloader_padding_striped
-from train_repair_CGAN_model.MODEL_Discriminator_CGAN_repair import EnhancedDiscriminator
-from train_repair_CGAN_model.MODEL_Generator_UNET import GeneratorUNet
-from train_repair_CGAN_model.MODEL_Generator_prompt2 import GeneratorUNetImproved
+from fmi_repair_CGAN_model.Dataloader_FMI_add_empty_stripe import dataloader_padding_striped
+from fmi_repair_CGAN_model.MODEL_Discriminator_CGAN_repair import EnhancedDiscriminator
+from fmi_repair_CGAN_model.MODEL_Generator_UNET import GeneratorUNet
+from fmi_repair_CGAN_model.MODEL_Generator_prompt2 import GeneratorUNetImproved
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--epoch", type=int, default=0, help="epoch to start training from")

@@ -147,16 +147,6 @@ def generate_single_period_sine_crack(config):
     mask = (rows >= crack_down) & (rows < crack_up)
     # 一次性填充所有像素
     img[mask] = 255
-    # # 4. 旧的创建裂缝区域
-    # for i in range(width):
-    #     # 计算裂缝的上下边界
-    #     y_min = int(max(0, crack_down[i]))
-    #     y_max = int(min(height, crack_up[i]))
-    #     # print(y_min,y_max)
-    #
-    #     # 在裂缝区域填充
-    #     if y_min < y_max:
-    #         img[y_min:y_max, i] = 255
 
     # 裂缝产生随机的断裂
     if random.random() < crack_break_ratio:
