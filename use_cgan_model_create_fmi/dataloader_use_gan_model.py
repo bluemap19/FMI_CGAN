@@ -2,6 +2,7 @@ import math
 import os
 import pandas as pd
 from skimage import exposure
+from tqdm import trange
 
 from src_plot.plot_logging import visualize_well_logs
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'  # 在导入任何库之前设置
@@ -565,6 +566,7 @@ class ImageDataset_FMI_SPLIT_NO_REPEAT(Dataset):
             # 静态 stat_mask 为对应的读取的原始mask数据进行(溶蚀)处理后 加0.5的噪声 处理
             # self.mask_stat = self.mask_stat*0.65 + self.mask_stat_p*0.35
             self.mask_stat = self.mask_stat_noise*0.5 + self.mask_stat_p*0.5
+            self.mask_stat = np.clip(self.mask_stat, 0, 255)
         else:
             print(f'path {path} does not exist')
             exit(0)
@@ -580,14 +582,16 @@ class ImageDataset_FMI_SPLIT_NO_REPEAT(Dataset):
         # 生成stat静态FMI图像对应的电阻率配置
         self.random_curves = get_random_logging(
             resolution=0.0025,
-            depth_start=1000,
+            depth_start=0,
             point_num=self.mask_background.shape[0],
-            plot=False,          # 是否可视化随机生成的测井曲线信息
+            plot=True,          # 是否可视化随机生成的测井曲线信息
             seed=42,
-            config_rxo_trend=[[10, 1], [20, 1], [30, 1], [30, 1], [20, 1], [10, 1],
-                              [10, 1], [20, 1], [30, 1], [30, 1], [20, 1], [10, 1],
-                              [10, 0.9755], [20, 0.9755], [30, 0.9735], [30, 0.9735], [20, 0.9735], [10, 0.9735],
-                              [10, 0.939], [20, 0.939], [30, 0.958], [30, 0.958], [20, 0.958], [10, 0.958]]
+            config_rxo_trend=[
+                  [10, 1], [20, 1], [30, 1], [30, 1], [20, 1], [10, 1],
+                  [10, 1], [20, 1], [30, 1], [30, 1], [20, 1], [10, 1],
+                  [10, 1], [20, 1], [30, 1], [30, 1], [20, 1], [10, 1],
+                  [10, 1], [20, 1], [30, 1], [30, 1], [20, 1], [10, 1],
+            ]
         )
 
         # self.dyna_mask_8，self.stat_mask_8 为动静态的mask8对应的图像矩阵分布，这里使用随机数，进行噪声随机分布添加
@@ -659,7 +663,7 @@ class ImageDataset_FMI_SPLIT_NO_REPEAT(Dataset):
     def get_base_shape(self):
         return self.shape_full_fmi
 
-    def combine_pic_list_to_full_fmi(self, img_gan):
+    def combine_pic_list_to_full_fmi(self, img_gan, adjust_stat_fmi=False):
         """
         # combine splits pic (from model) to a layer FMI image
         将模型输出的电成像数据进行合并，合并成完整的FMI数据
@@ -667,7 +671,7 @@ class ImageDataset_FMI_SPLIT_NO_REPEAT(Dataset):
         img_dyna_gan_full = np.zeros(self.get_base_shape())
         img_stat_gan_full = np.zeros(self.get_base_shape())
         # 根据模型生成的电成像图像矩阵[M*2*256*256]，逐窗口进行，电成像测井图像数据的合并
-        for i in range(img_gan.shape[0]):
+        for i in trange(img_gan.shape[0]):
             dyna_t = img_gan[i, 0, :, :]
             stat_t = img_gan[i, 1, :, :]
 
@@ -683,13 +687,16 @@ class ImageDataset_FMI_SPLIT_NO_REPEAT(Dataset):
                 img_dyna_gan_full[-self.win_len:, :] = dyna_t
                 img_stat_gan_full[-self.win_len:, :] = stat_t
 
-        # 图像的融合增强，逐窗口进行 stat_FMI 图像像素分布调整
-        window_adjust_stat_image = 64
-        img_stat_adjust = img_stat_gan_full.copy()
-        for i in range(img_stat_gan_full.shape[0]-window_adjust_stat_image):
-            stat_data_windows = img_stat_gan_full[i:i+window_adjust_stat_image, :]
-            stat_data_windows = self.adjust_pic_by_r_curve(pic_list=[stat_data_windows], index=i+window_adjust_stat_image//2)[0]
-            img_stat_adjust[i:i + window_adjust_stat_image, :] = stat_data_windows
+        if adjust_stat_fmi:
+            # 图像的融合增强，逐窗口进行 stat_FMI 图像像素分布调整
+            window_adjust_stat_image = 64
+            img_stat_adjust = img_stat_gan_full.copy()
+            for i in range(img_stat_gan_full.shape[0]-window_adjust_stat_image):
+                stat_data_windows = img_stat_gan_full[i:i+window_adjust_stat_image, :]
+                stat_data_windows = self.adjust_pic_by_r_curve(pic_list=[stat_data_windows], index=i+window_adjust_stat_image//2)[0]
+                img_stat_adjust[i:i + window_adjust_stat_image, :] = stat_data_windows
+        else:
+            img_stat_adjust = img_stat_gan_full.copy()
 
         # 动态电成像生成，根据 静态电成像 计算 动态电成像数据
         img_dyna_fmi = stat_pic_dynamic_enhancement(img_stat_adjust, windows_length=20, step=1)
@@ -701,7 +708,7 @@ class ImageDataset_FMI_SPLIT_NO_REPEAT(Dataset):
 
 
 if __name__ == '__main__':
-    a = ImageDataset_FMI_SPLIT_NO_REPEAT()
+    a = ImageDataset_FMI_SPLIT_NO_REPEAT(path=r'D:\GitHub\FMI_CGAN\fracture_mask_simulate\mask\2\background_mask_bedding.png')
     for i in range(10):
         b = a[i]
         show_Pic([b[0,:,:], b[1, :, :], b[2,:,:], b[3,:,:]], pic_order='22')

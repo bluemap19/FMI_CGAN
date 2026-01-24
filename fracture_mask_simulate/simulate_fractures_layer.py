@@ -107,7 +107,7 @@ def df_background_para_adjust_final(df, window_length=5):
     return result_df
 
 
-def add_depth_column(image_FMI):
+def add_depth_column(image_FMI, depth_start=0, depth_resolution=0.0025):
     """
     为电成像图像数组添加索引列
     参数:
@@ -121,6 +121,7 @@ def add_depth_column(image_FMI):
 
     # 2. 创建深度列 (0-9999的等差数列)
     depth_column = np.arange(0, image_FMI.shape[0], dtype=np.float32).reshape(-1, 1)
+    depth_column = depth_column*depth_resolution+depth_start
 
     # 3. 将索引列添加到原始数组的第一列
     # 使用np.hstack水平拼接

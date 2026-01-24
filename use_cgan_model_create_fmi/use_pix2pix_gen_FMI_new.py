@@ -6,6 +6,7 @@ import time
 from torch.utils.data import DataLoader
 from torch.autograd import Variable
 import torch
+from tqdm import tqdm
 
 from fracture_mask_simulate.simulate_fractures_layer import add_depth_column
 from src_ele.ele_data_process import dynamic_enhancement
@@ -106,7 +107,7 @@ def use_pix2pix_gen_FMI(opt):
         generator = generator.cuda()
 
     dataloader_base = ImageDataset_FMI_SPLIT_NO_REPEAT(path=opt.dataset_path, x_l=opt.img_size_x, y_l=opt.img_size_x, win_len=opt.win_len)
-    print('split layer to :{} windows to simulate'.format(dataloader_base.length))
+    print('split layer to :{} no_repeat windows to simulate'.format(dataloader_base.length))
     dataloader = DataLoader(dataloader_base, shuffle=False, batch_size=opt.batch_size, drop_last=False, pin_memory=False, num_workers=opt.n_cpu)
 
     # Tensor type
@@ -114,7 +115,8 @@ def use_pix2pix_gen_FMI(opt):
 
     img_gan = np.array([])
     with torch.no_grad():
-        for i, mask in enumerate(dataloader):
+        # for i, mask in enumerate(dataloader):
+        for mask in tqdm(dataloader):
             # Model inputs
             mask = Variable(mask.type(Tensor))
 
@@ -130,17 +132,17 @@ def use_pix2pix_gen_FMI(opt):
             else:
                 img_gan = np.append(img_gan, gen_parts, axis=0)
 
-    img_stat_gan_full, img_dyna_gan_full = dataloader_base.combine_pic_list_to_full_fmi(img_gan)
+    img_stat_gan_full, img_dyna_gan_full = dataloader_base.combine_pic_list_to_full_fmi(img_gan, adjust_stat_fmi=False)
 
     path_o = opt.dataset_path.replace('simu_cracks', 'simu_FMI')
     # print(path_o)
     cv2.imwrite(path_o.replace('background_mask', 'fmi_dyna'), (img_dyna_gan_full).astype(np.uint8))
     cv2.imwrite(path_o.replace('background_mask', 'fmi_stat'), (img_stat_gan_full).astype(np.uint8))
-    img_dyna_gan_full = add_depth_column(img_dyna_gan_full)
-    np.savetxt(path_o.replace('background_mask.png', 'fmi_dyna_simu.txt'), img_dyna_gan_full, comments='', delimiter='    ', fmt='%.2f',
+    img_dyna_gan_full = add_depth_column(img_dyna_gan_full, depth_start=0, depth_resolution=0.0025)
+    np.savetxt(path_o.replace('background_mask', 'fmi_dyna_simu').replace('.png', '.txt'), img_dyna_gan_full, comments='', delimiter='    ', fmt='%.6f',
                header='simu_dyna\n100\n104\nIMAGE.DYNA_SIMU\n\n\n\n')
-    img_stat_gan_full = add_depth_column(img_stat_gan_full)
-    np.savetxt(path_o.replace('background_mask.png', 'fmi_stat_simu.txt'), img_stat_gan_full, comments='', delimiter='    ', fmt='%.2f',
+    img_stat_gan_full = add_depth_column(img_stat_gan_full, depth_start=0, depth_resolution=0.0025)
+    np.savetxt(path_o.replace('background_mask', 'fmi_stat_simu').replace('.png', '.txt'), img_stat_gan_full, comments='', delimiter='    ', fmt='%.6f',
                header='simu_stat\n100\n104\nIMAGE.STAT_SIMU\n\n\n\n')
 
 
@@ -151,7 +153,8 @@ if __name__ == '__main__':
     parser.add_argument("--img_size_y", type=int, default=256, help="size of image width")
     parser.add_argument("--channels_in", type=int, default=4, help="number of image channels")
     parser.add_argument("--channels_out", type=int, default=2, help="number of image channels")
-    parser.add_argument("--dataset_path", type=str, default=r"F:\DeepLData\FMI_SIMULATION\simu_cracks\2_background_mask.png", help="path of the dataset")
+    # parser.add_argument("--dataset_path", type=str, default=r"F:\DeepLData\FMI_SIMULATION\simu_cracks\2_background_mask.png", help="path of the dataset")
+    parser.add_argument("--dataset_path", type=str, default=r"D:\GitHub\FMI_CGAN\fracture_mask_simulate\mask\2\background_mask_bedding.png", help="path of the dataset")
     parser.add_argument("--netG", type=str, default=r'D:\GitHub\FMI_CGAN\train_pix2pix_simulate\saved_models\pic2pic\3\best_generator.pth', help="netG path to load")
     parser.add_argument("--batch_size", type=int, default=32, help="size of the batches")
     parser.add_argument("--n_cpu", type=int, default=1, help="num of cpu to process input data")
