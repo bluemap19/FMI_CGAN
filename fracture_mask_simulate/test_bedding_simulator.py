@@ -23,7 +23,7 @@ class bedding_mask_simulator:
             'height': 400,  # 图像高度
             'x_shift': 0.4,  # 纹层水平相位的偏移 [0,1]
             'noise_level': 0.1,  # 噪声水平 [0,1]
-            'thickness': 10,  # 层厚（像素）
+            'laminar_thickness': 10,  # 层厚（像素）
             'amplitude': 0.1,  # 波动幅度 [0,1] 或像素值
             'thickness_variation': 0.02,  # 厚度变化范围 [0,1]
             'waveform': 'sine',  # 波形类型: 'sine', 'cosine', 'sawtooth', 'triangle'
@@ -33,7 +33,7 @@ class bedding_mask_simulator:
         self.CONFIG_BEDDING_DEFAULT['break_config']={
             'break_num_range': [0, 0, 0, 0, 1, 1, 2],  # 0-2 个断裂
             'break_length_range': (5, 20),  # 断裂长度8-20像素
-            'break_height_range': (1, self.CONFIG_BEDDING_DEFAULT['thickness']),  # 断裂高度2-5像素
+            'break_height_range': (1, self.CONFIG_BEDDING_DEFAULT['laminar_thickness']),  # 断裂高度2-5像素
             'min_separation': 15,  # 断裂最小间隔15像素
         }
 
@@ -51,8 +51,11 @@ class bedding_mask_simulator:
             warnings.warn(f"noise_level ({default_config['noise_level']}) should be in [0, 1], clamping...")
             default_config['noise_level'] = np.clip(default_config['noise_level'], 0, 1)
 
-        if default_config['thickness'] <= 0:
-            raise ValueError(f"thickness must be positive, got {default_config['thickness']}")
+        if default_config['laminar_thickness'] <= 0:
+            raise ValueError(f"thickness must be positive, got {default_config['laminar_thickness']}")
+
+        if default_config['laminar_gap'] <= 0:
+            raise ValueError(f"gap must be positive, got {default_config['laminar_thickness']}")
 
         if default_config['amplitude'] <= 0:
             raise ValueError(f"amplitude must be positive, got {default_config['amplitude']}")
@@ -112,7 +115,7 @@ class bedding_mask_simulator:
             return curve
 
     def _calculate_layer_centers(self, num_layers: int, base_center: float, thickness: float,
-                                 thickness_variation: float, random_state: np.random.RandomState) -> np.ndarray:
+                                 thickness_variation: float, gap:int, random_state: np.random.RandomState) -> np.ndarray:
         """计算纹层中心位置（向量化实现）"""
         if num_layers <= 0:
             return np.array([])
@@ -120,11 +123,16 @@ class bedding_mask_simulator:
         # 生成随机的厚度变化
         variations = 1 + random_state.uniform(-thickness_variation, thickness_variation, num_layers)
 
-        # 累积计算中心位置
-        centers = np.cumsum(np.ones(num_layers) * thickness * variations) + base_center - thickness
-        centers[0] = base_center  # 第一个中心位置
+        # # 累积计算中心位置
+        centers = []
+        for layer in range(num_layers):
+            if layer == 0:
+                centers.append(base_center)     ####### 第一个中心位置
+            else:
+                centers.append(centers[-1]+gap)
+            centers.append(centers[-1]+thickness*variations[layer])
 
-        return centers.astype(int)
+        return np.array(centers).astype(int)
 
     def _create_layer_mask_vectorized(
             self,
@@ -168,7 +176,6 @@ class bedding_mask_simulator:
         # 5. 解析配置
         break_num_range = break_config.get('break_num_range', [0, 0, 0, 0, 0, 1,])
         break_length_range = break_config.get('break_length_range', (5, 20))
-        min_separation = break_config.get('min_separation', 10)
 
         # 7. 随机确定断裂数量
         break_num = np.random.choice(break_num_range)
@@ -264,10 +271,7 @@ class bedding_mask_simulator:
         返回:
             np.ndarray: 纹层掩模图像
         """
-        # 1. 验证和合并配置
-        config = self._validate_config(config or {})
-
-        # 设置随机种子
+        # 1. 设置随机种子、配置读取
         random_state = np.random.RandomState(random_seed)
 
         # 提取参数
@@ -275,7 +279,8 @@ class bedding_mask_simulator:
         height = config['height']
         x_shift = config['x_shift']
         noise_level = config['noise_level']
-        thickness = config['thickness']
+        thickness = config['laminar_thickness']
+        gap = config['laminar_gap']
         amplitude = config['amplitude']
         thickness_variation = config['thickness_variation']
         waveform = config['waveform']
@@ -285,25 +290,35 @@ class bedding_mask_simulator:
         # 2. 创建空白图像
         img = np.full((height, width), self.VALUE_BACKGROUND, dtype=np.uint8)
 
-        # 3. 标准化振幅
+        # 3. 标准化 层厚 振幅 以及 纹层之间的间隔
         if amplitude <= 1:  # 如果小于等于1，认为是比例
             amplitude_pixels = int(amplitude * height)
         else:  # 否则认为是像素值
             amplitude_pixels = int(amplitude)
+        if gap <= 1:  # 如果小于等于1，认为是比例
+            gap_pixels = int(gap * height)
+        else:  # 否则认为是像素值
+            gap_pixels = int(gap)
+        if thickness <= 1:
+            thickness_pixels = int(thickness * height)
+        else:
+            thickness_pixels = int(thickness)
 
         # 4. 生成基础波形
         base_wave = self._generate_base_waveform(width, x_shift, amplitude_pixels, waveform)
 
         # 5. 计算纹层数量
+        # usable_height = height - 2 * amplitude_pixels
+        # signal_num = max(1, math.floor(usable_height / thickness_pixels))
         usable_height = height - 2 * amplitude_pixels
-        signal_num = max(1, math.floor(usable_height / thickness))
+        signal_num = max(1, math.floor((usable_height+gap_pixels) / (thickness_pixels+gap_pixels)))
 
         # 6. 预分配曲线数组
         curves = []
-        centers = self._calculate_layer_centers(signal_num, amplitude_pixels, thickness, thickness_variation, random_state)
+        centers = self._calculate_layer_centers(signal_num, amplitude_pixels, thickness_pixels, thickness_variation, gap_pixels, random_state)
 
         # 7. 生成所有纹层曲线
-        for i in range(signal_num):
+        for i in range(2*signal_num):
             # 添加噪声
             noisy_curve = self._add_noise_to_curve(base_wave, noise_level, amplitude_pixels, random_state)
 
@@ -328,7 +343,7 @@ class bedding_mask_simulator:
         img = self._crop_image_to_content(img)
 
         # 10. 记录生成信息
-        self._log_generation_info(width, height, signal_num, centers, amplitude_pixels, waveform)
+        self._log_generation_info(width, height, signal_num, centers, amplitude_pixels, thickness_pixels, gap_pixels, waveform)
 
         return img
 
@@ -348,11 +363,11 @@ class bedding_mask_simulator:
         return bedding_mask, bedding_target
 
     def _log_generation_info(self, width: int, height: int, signal_num: int,
-                             centers: List[int], amplitude: int, waveform: str):
+                             centers: List[int], amplitude: int, thickness_pixels:int, gap_pixels:int, waveform: str):
         """记录生成信息"""
         print(f"Generated bedding image: {width}x{height}, "
               f"layers: {signal_num // 2}, centers: {centers[:10]}..., "
-              f"amplitude: {amplitude}, waveform: {waveform}")
+              f"amplitude: {amplitude}, thickness: {thickness_pixels}, gap: {gap_pixels}, waveform: {waveform}")
 
 
 
@@ -367,8 +382,9 @@ if __name__ == "__main__":
         'width': 256,
         'height': 400,
         'x_shift': 0.3,
-        'noise_level': 0.1,
-        'thickness': 6,
+        'noise_level': 0.01,
+        'laminar_thickness': 2,
+        'laminar_gap': 2,
         'amplitude': 0.06,
         'thickness_variation': 0.05,
         'waveform': 'sine',

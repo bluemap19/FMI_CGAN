@@ -565,7 +565,8 @@ class ImageDataset_FMI_SPLIT_NO_REPEAT(Dataset):
 
             # 静态 stat_mask 为对应的读取的原始mask数据进行(溶蚀)处理后 加0.5的噪声 处理
             # self.mask_stat = self.mask_stat*0.65 + self.mask_stat_p*0.35
-            self.mask_stat = self.mask_stat_noise*0.5 + self.mask_stat_p*0.5
+            self.mask_stat = self.mask_stat_noise*0.0 + self.mask_stat_p*1.0
+            # self.mask_stat = 255 - self.mask_stat
             self.mask_stat = np.clip(self.mask_stat, 0, 255)
         else:
             print(f'path {path} does not exist')
@@ -584,7 +585,7 @@ class ImageDataset_FMI_SPLIT_NO_REPEAT(Dataset):
             resolution=0.0025,
             depth_start=0,
             point_num=self.mask_background.shape[0],
-            plot=True,          # 是否可视化随机生成的测井曲线信息
+            plot=False,          # 是否可视化随机生成的测井曲线信息
             seed=42,
             config_rxo_trend=[
                   [10, 1], [20, 1], [30, 1], [30, 1], [20, 1], [10, 1],
@@ -649,12 +650,19 @@ class ImageDataset_FMI_SPLIT_NO_REPEAT(Dataset):
         # 'normalized': normalized.ravel(),
         # 'N_lower': N_lower.ravel(),
         # 'N_upper': N_upper.ravel(),
+        # 计算理论上的中心点索引
+        calculated_index = index * self.win_len + self.win_len // 2
+
+        # 确保索引不超过DataFrame的最大索引
+        max_index = len(self.random_curves) - 1
+        safe_index = min(calculated_index, max_index)
+
         index_cols = self.random_curves.columns.get_loc('normalized')
-        r_index = self.random_curves.iloc[index, index_cols]
+        r_index = self.random_curves.iloc[safe_index, index_cols]
         index_cols = self.random_curves.columns.get_loc('N_lower')
-        r_lower_index = self.random_curves.iloc[index, index_cols]
+        r_lower_index = self.random_curves.iloc[safe_index, index_cols]
         index_cols = self.random_curves.columns.get_loc('N_upper')
-        r_upper_index = self.random_curves.iloc[index, index_cols]
+        r_upper_index = self.random_curves.iloc[safe_index, index_cols]
 
         for i in range(len(pic_list)):
             pic_list[i] = adjust_pic_range(pic_list[i], r_index, r_lower_index, r_upper_index)
@@ -708,7 +716,8 @@ class ImageDataset_FMI_SPLIT_NO_REPEAT(Dataset):
 
 
 if __name__ == '__main__':
-    a = ImageDataset_FMI_SPLIT_NO_REPEAT(path=r'D:\GitHub\FMI_CGAN\fracture_mask_simulate\mask\2\background_mask_bedding.png')
+    a = ImageDataset_FMI_SPLIT_NO_REPEAT(path=r'D:\GitHub\FMI_CGAN\fracture_mask_simulate\mask\3\background_mask_bedding.png')
+    print(a.length)
     for i in range(10):
         b = a[i]
         show_Pic([b[0,:,:], b[1, :, :], b[2,:,:], b[3,:,:]], pic_order='22')

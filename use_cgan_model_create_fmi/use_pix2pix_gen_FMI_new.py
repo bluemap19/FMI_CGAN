@@ -154,7 +154,7 @@ if __name__ == '__main__':
     parser.add_argument("--channels_in", type=int, default=4, help="number of image channels")
     parser.add_argument("--channels_out", type=int, default=2, help="number of image channels")
     # parser.add_argument("--dataset_path", type=str, default=r"F:\DeepLData\FMI_SIMULATION\simu_cracks\2_background_mask.png", help="path of the dataset")
-    parser.add_argument("--dataset_path", type=str, default=r"D:\GitHub\FMI_CGAN\fracture_mask_simulate\mask\2\background_mask_bedding.png", help="path of the dataset")
+    parser.add_argument("--dataset_path", type=str, default=r"D:\GitHub\FMI_CGAN\fracture_mask_simulate\mask\3\background_mask_bedding.png", help="path of the dataset")
     parser.add_argument("--netG", type=str, default=r'D:\GitHub\FMI_CGAN\train_pix2pix_simulate\saved_models\pic2pic\3\best_generator.pth', help="netG path to load")
     parser.add_argument("--batch_size", type=int, default=32, help="size of the batches")
     parser.add_argument("--n_cpu", type=int, default=1, help="num of cpu to process input data")

@@ -553,10 +553,35 @@ class cracks_mask_simulator:
             crack_random, crack_target = fms.generate_crack_by_config(crack_config=config_temp)
             crack_start_height = config_temp['crack_start_height']
             height_draw = config_temp['height_draw']
-            crack_random = cv2.resize(crack_random, (width_background, height_draw))
-            crack_target = cv2.resize(crack_target, (width_background, height_draw))
-            IMG_background[crack_start_height:crack_start_height+height_draw] += crack_random
-            IMG_background_target[crack_start_height:crack_start_height+height_draw] += crack_target
+
+            # 使用最近邻插值保持裂缝的离散特性
+            crack_random = cv2.resize(crack_random, (width_background, height_draw), interpolation=cv2.INTER_NEAREST)
+            crack_target = cv2.resize(crack_target, (width_background, height_draw), interpolation=cv2.INTER_NEAREST)
+
+            # 获取当前裂缝在背景中的位置范围
+            start_row = crack_start_height
+            end_row = min(crack_start_height + height_draw, height_background)
+
+            # 获取当前裂缝区域
+            current_region_random = IMG_background[start_row:end_row, :]
+            current_region_target = IMG_background_target[start_row:end_row, :]
+
+            # 创建掩码：只在新裂缝有值且背景为0的区域进行替换
+            mask_random = (crack_random != self.VALUE_BACKGROUND) & (current_region_random == self.VALUE_BACKGROUND)
+            mask_target = (crack_target != self.VALUE_BACKGROUND) & (current_region_target == self.VALUE_BACKGROUND)
+
+            ################## 方法1：优先处理 - 新裂缝覆盖空白区域，已有裂缝保持不变
+            current_region_random[mask_random] = crack_random[mask_random]
+            current_region_target[mask_target] = crack_target[mask_target]
+            ################## 方法2：如果需要后生成的裂缝覆盖先生成的裂缝，使用以下代码
+            # mask_random_new = crack_random != self.VALUE_BACKGROUND
+            # mask_target_new = crack_target != self.VALUE_BACKGROUND
+            # current_region_random[mask_random_new] = crack_random[mask_random_new]
+            # current_region_target[mask_target_new] = crack_target[mask_target_new]
+
+            # 更新背景图像
+            IMG_background[start_row:end_row, :] = current_region_random
+            IMG_background_target[start_row:end_row, :] = current_region_target
 
         index_start, index_end = get_pic_top_and_bottle_index(IMG_background)
         return IMG_background[index_start:index_end, :], IMG_background_target[index_start:index_end, :]

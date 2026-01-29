@@ -9,36 +9,40 @@ def get_bedding_configs():
     # 1. 生成单个纹层图像
     config_bedding_base = {
         'width': 256,
-        'height': 12000,
-        'x_shift': 0.3,
+        'height': 400,
+        'x_shift': 0.25,
         'noise_level': 0.1,
-        'thickness': 6,
+        'laminar_thickness': 6,
+        'laminar_gap': 50,
         'amplitude': 0.06,
-        'thickness_variation': 0.05,
+        'thickness_variation': 0.00,
         'waveform': 'sine',
         'random_seed': 42,
         'break_config': {
-            'break_num_range': [0, 0, 0, 0, 0, 0, 1, 2],  # 0-2 个断裂
+            # 'break_num_range': [0, 0, 0, 0, 0, 0, 1, 1, 2],  # 0-2 个断裂
+            'break_num_range': [0, 0, 0, 0, 0, 0],  # 0 个断裂
             'break_length_range': (5, 20),  # 断裂长度8-20像素
             'min_separation': 15,  # 断裂最小间隔15像素
         }
     }
 
-    # x_shift_list = [0, 0.25, 0.5, 0.75]
-    x_shift_list = [0.25]
     # thickness_list = [5, 10, 15, 20, 25]
-    thickness_list = [5, 10, 15, 20, 25]
-    # amplitude_list = [5, 10, 15, 20, 25]
-    amplitude_list = [10]
+    thickness_list = [2, 3, 4, 5, 6, 7, 8, 9, 10]
+    amplitude_list = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
+    count_list = [1, 2, 3, 4, 5, 6]
+    # amplitude_list = [10]
 
     config_bedding_list = []
-    for x_shift in x_shift_list:
-        for thickness in thickness_list:
-            for amplitude in amplitude_list:
+    for thickness in thickness_list:
+        for amplitude in amplitude_list:
+            for count in count_list:
                 config_temp = config_bedding_base.copy()
-                config_temp['x_shift'] = x_shift
-                config_temp['thickness'] = thickness
+                config_temp['laminar_thickness'] = thickness
+                config_temp['laminar_gap'] = thickness+1
                 config_temp['amplitude'] = amplitude
+                config_temp['noise_level'] = thickness/60
+                config_temp['laminar_count'] = count
+                config_temp['height'] = (config_temp['laminar_thickness']+config_temp['laminar_gap'])*count+2*config_temp['amplitude']-config_temp['laminar_gap']
                 config_bedding_list.append(config_temp)
 
     return config_bedding_list
@@ -72,6 +76,7 @@ class fmi_simulator():
         config_bedding_list = get_bedding_configs()
         config_write_list = []
         image_save = np.array([])
+        pixel_gap = 40
         for config in config_bedding_list:
             mask_bedding, bedding_target = self.simulator_bedding.get_bedding_mask_by_config(config)
             config_write = {
@@ -79,16 +84,21 @@ class fmi_simulator():
                 'height': mask_bedding.shape[0],
                 'x_shift': config['x_shift'],
                 'noise_level': config['noise_level'],
-                'thickness': config['thickness'],
+                'laminar_thickness': config['laminar_thickness'],
+                'laminar_gap':config['laminar_gap'],
                 'amplitude': config['amplitude'],
                 'thickness_variation': config['thickness_variation'],
+                'laminar_count': config['laminar_count'],
             }
             config_write_list.append(config_write)
             if image_save.size == 0:
                 image_save = mask_bedding.copy()
             else:
                 image_save = np.concatenate((image_save, mask_bedding.copy()), axis=0)
-            # show_Pic([mask_bedding, bedding_target], figure=[16, 12])
+
+            empty_gap = np.zeros((pixel_gap, config['width']))
+            image_save = np.concatenate((image_save, empty_gap), axis=0)
+            # show_Pic([mask_bedding, bedding_target, image_save], figure=[16, 12])
 
         image_save = self.map_matrix_dict_method(image_save)
 
@@ -107,7 +117,6 @@ class fmi_simulator():
         for value in self.mapping_dict.keys():
             # 应用映射
             result[matrix == value] = self.mapping_dict[value]
-
 
         return result
 
