@@ -9,7 +9,7 @@ def get_bedding_configs():
     # 1. 生成单个纹层图像
     config_bedding_base = {
         'width': 256,
-        'height': 400,
+        'height': 10000,
         'x_shift': 0.25,
         'noise_level': 0.1,
         'laminar_thickness': 6,
@@ -27,9 +27,9 @@ def get_bedding_configs():
     }
 
     # thickness_list = [5, 10, 15, 20, 25]
-    thickness_list = [2, 3, 4, 5, 6, 7, 8, 9, 10]
-    amplitude_list = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
-    count_list = [1, 2, 3, 4, 5, 6]
+    thickness_list = [1, 2, 4, 8, 16, 32, 64, 128]
+    amplitude_list = [1, 4, 64, 512, 2048, 4096, 8192, 16384, 32768]
+    count_list = [1, 2, 4, 8, 16, 32, 64, 128, 256]
     # amplitude_list = [10]
 
     config_bedding_list = []
@@ -76,7 +76,7 @@ class fmi_simulator():
         config_bedding_list = get_bedding_configs()
         config_write_list = []
         image_save = np.array([])
-        pixel_gap = 40
+        pixel_gap = 100000
         for config in config_bedding_list:
             mask_bedding, bedding_target = self.simulator_bedding.get_bedding_mask_by_config(config)
             config_write = {
