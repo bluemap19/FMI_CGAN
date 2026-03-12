@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 
 from fracture_mask_simulate.test_bedding_simulator import bedding_mask_simulator
 from src_ele.pic_opeeration import show_Pic
@@ -8,7 +9,7 @@ from src_ele.pic_opeeration import show_Pic
 def get_bedding_configs():
     # 1. 生成单个纹层图像
     config_bedding_base = {
-        'width': 256,
+        'width': 4000,
         'height': 10000,
         'x_shift': 0.25,
         'noise_level': 0.1,
@@ -26,10 +27,12 @@ def get_bedding_configs():
         }
     }
 
-    # thickness_list = [5, 10, 15, 20, 25]
-    thickness_list = [1, 2, 4, 8, 16, 32, 64, 128]
-    amplitude_list = [1, 4, 64, 512, 2048, 4096, 8192, 16384, 32768]
-    count_list = [1, 2, 4, 8, 16, 32, 64, 128, 256]
+    # thickness_list = [2, 4, 8, 16, 32, 64, 128]
+    thickness_list = [2, 10, 20, 30, 40, 50]
+    # amplitude_list = [2, 4, 8, 16, 32, 64, 128, 512, 1024, 2048, 4096, 8192, 16384, 32768]
+    amplitude_list = [2, 1000, 2000, 3000, 4000, 5000]
+    # count_list = [1, 2, 4, 8, 16, 32, 64, 128, 256]
+    count_list = [1, 20, 40, 60, 80, 100]
     # amplitude_list = [10]
 
     config_bedding_list = []
@@ -40,7 +43,7 @@ def get_bedding_configs():
                 config_temp['laminar_thickness'] = thickness
                 config_temp['laminar_gap'] = thickness+1
                 config_temp['amplitude'] = amplitude
-                config_temp['noise_level'] = thickness/60
+                config_temp['noise_level'] = 0
                 config_temp['laminar_count'] = count
                 config_temp['height'] = (config_temp['laminar_thickness']+config_temp['laminar_gap'])*count+2*config_temp['amplitude']-config_temp['laminar_gap']
                 config_bedding_list.append(config_temp)
@@ -60,14 +63,13 @@ class fmi_simulator():
         self.VALUE_BEDDING = 4
         self.VALUE_BREAKOUT = 5
 
-
         # 定义映射字典
         self.mapping_dict = {
             self.VALUE_BACKGROUND: 0,
             self.VALUE_HIGH_CONDUCTIVITY: 255,
             self.VALUE_HIGH_RESISTANCE: 255,
             self.VALUE_INDUCED: 255,
-            self.VALUE_BEDDING: 255
+            self.VALUE_BEDDING: 255,
             # 注意：5没有在映射中，如果需要映射5，可以添加
             # 5: 你想要的值
         }
@@ -75,9 +77,9 @@ class fmi_simulator():
     def get_fmi_bedding_mask(self):
         config_bedding_list = get_bedding_configs()
         config_write_list = []
-        image_save = np.array([])
+        # image_save = np.array([])
         pixel_gap = 100000
-        for config in config_bedding_list:
+        for config in tqdm(config_bedding_list):
             mask_bedding, bedding_target = self.simulator_bedding.get_bedding_mask_by_config(config)
             config_write = {
                 'width': config['width'],
@@ -90,22 +92,31 @@ class fmi_simulator():
                 'thickness_variation': config['thickness_variation'],
                 'laminar_count': config['laminar_count'],
             }
-            config_write_list.append(config_write)
-            if image_save.size == 0:
-                image_save = mask_bedding.copy()
-            else:
-                image_save = np.concatenate((image_save, mask_bedding.copy()), axis=0)
 
-            empty_gap = np.zeros((pixel_gap, config['width']))
-            image_save = np.concatenate((image_save, empty_gap), axis=0)
+            config_write_list.append(config_write)
+            cv2.imwrite('mask_temp2/mask_bedding_laminarthickness_{}_laminargap_{}_amplitude_{}_thicknessvariation_{}_laminarcount_{}_.png'.format(
+                config['laminar_thickness'],
+                config['laminar_gap'],
+                config['amplitude'],
+                config['thickness_variation'],
+                config['laminar_count']
+            ),
+            mask_bedding*255)
+            # if image_save.size == 0:
+            #     image_save = mask_bedding.copy()
+            # else:
+            #     image_save = np.concatenate((image_save, mask_bedding.copy()), axis=0)
+
+            # empty_gap = np.zeros((pixel_gap, config['width']))
+            # image_save = np.concatenate((image_save, empty_gap), axis=0)
             # show_Pic([mask_bedding, bedding_target, image_save], figure=[16, 12])
 
-        image_save = self.map_matrix_dict_method(image_save)
+        # image_save = self.map_matrix_dict_method(image_save)
 
-        df_write = pd.DataFrame(config_write_list)
-        print(df_write.describe())
-        cv2.imwrite('mask_bedding.png', image_save)
-        df_write.to_csv('mask_bedding.csv', index=False)
+        # df_write = pd.DataFrame(config_write_list)
+        # print(df_write.describe())
+        # cv2.imwrite('mask_bedding.png', image_save)
+        # df_write.to_csv('mask_bedding.csv', index=False)
 
     def map_matrix_dict_method(self, matrix):
         """

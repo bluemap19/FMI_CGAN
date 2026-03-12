@@ -12,3 +12,6 @@
 /FMI_Para_calucate/windows400-data-range-enhenced2/
 *.xlsx
 *.txt
+/fracture_mask_simulate/mask/
+/fracture_mask_simulate/mask_temp/
+/fracture_mask_simulate/mask_temp2/
