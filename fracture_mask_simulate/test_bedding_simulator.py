@@ -61,13 +61,11 @@ class bedding_mask_simulator:
             raise ValueError(f"amplitude must be positive, got {default_config['amplitude']}")
 
         if not (0 <= default_config['thickness_variation'] <= 0.5):
-            warnings.warn(
-                f"thickness_variation ({default_config['thickness_variation']}) should be in [0, 0.5], clamping...")
+            warnings.warn(f"thickness_variation ({default_config['thickness_variation']}) should be in [0, 0.5], clamping...")
             default_config['thickness_variation'] = np.clip(default_config['thickness_variation'], 0, 0.5)
 
         if default_config['waveform'] not in ['sine', 'cosine', 'sawtooth', 'triangle']:
-            raise ValueError(
-                f"waveform must be one of ['sine', 'cosine', 'sawtooth', 'triangle'], got {default_config['waveform']}")
+            raise ValueError(f"waveform must be one of ['sine', 'cosine', 'sawtooth', 'triangle'], got {default_config['waveform']}")
 
         return default_config
 

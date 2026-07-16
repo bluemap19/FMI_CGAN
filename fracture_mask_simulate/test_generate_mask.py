@@ -10,7 +10,7 @@ def get_bedding_configs():
     # 1. 生成单个纹层图像
     config_bedding_base = {
         'width': 4000,
-        'height': 10000,
+        'height': 100000,
         'x_shift': 0.25,
         'noise_level': 0.1,
         'laminar_thickness': 6,
@@ -27,13 +27,16 @@ def get_bedding_configs():
         }
     }
 
-    # thickness_list = [2, 4, 8, 16, 32, 64, 128]
-    thickness_list = [2, 10, 20, 30, 40, 50]
-    # amplitude_list = [2, 4, 8, 16, 32, 64, 128, 512, 1024, 2048, 4096, 8192, 16384, 32768]
-    amplitude_list = [2, 1000, 2000, 3000, 4000, 5000]
-    # count_list = [1, 2, 4, 8, 16, 32, 64, 128, 256]
-    count_list = [1, 20, 40, 60, 80, 100]
-    # amplitude_list = [10]
+    # thickness_list = [2, 4, 8, 10, 20, 30, 40, 50, 100, 200, 300, 400, 500, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000]
+    thickness_list = [4]
+
+    # amplitude_list = [2, 10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000, 90000, 100000, 110000, 120000, 130000, 140000, 150000, 160000, 170000, 180000, 190000, 2000000]
+    # amplitude_list = [160000, 170000, 180000, 190000, 200000, 210000, 220000, 230000, 240000, 250000, 260000, 270000, 280000, 290000, 300000, 320000, 330000, 340000, 350000, 360000, 370000, 380000, 390000, 400000, 410000, 420000, 430000, 440000, 450000, 460000, 470000, 480000, 490000, 500000, 600000, 700000, 800000, 900000, 1000000]
+    amplitude_list = [10000]
+
+    # count_list = [10]
+    # count_list = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+    count_list = [200, 300, 400, 500, 600, 700, 800, 900, 1000]
 
     config_bedding_list = []
     for thickness in thickness_list:
@@ -94,7 +97,7 @@ class fmi_simulator():
             }
 
             config_write_list.append(config_write)
-            cv2.imwrite('mask_temp2/mask_bedding_laminarthickness_{}_laminargap_{}_amplitude_{}_thicknessvariation_{}_laminarcount_{}_.png'.format(
+            cv2.imwrite('mask_temp/mask_bedding_laminarthickness_{}_laminargap_{}_amplitude_{}_thicknessvariation_{}_laminarcount_{}_.png'.format(
                 config['laminar_thickness'],
                 config['laminar_gap'],
                 config['amplitude'],
@@ -123,7 +126,7 @@ class fmi_simulator():
         使用字典映射方法
         """
 
-        # 创建结果矩阵的副本
+        ############### 创建结果矩阵的副本
         result = matrix.copy().astype(np.uint8)  # 确保是8位无符号整数
         for value in self.mapping_dict.keys():
             # 应用映射

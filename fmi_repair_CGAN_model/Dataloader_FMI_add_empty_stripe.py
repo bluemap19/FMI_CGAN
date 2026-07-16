@@ -268,7 +268,8 @@ class dataloader_FMI_logging_no_repeat(Dataset):
         pic_length_target:图像输出的窗长大小
         mask_config:掩码配置
         """
-        self.pic_origin = cv2.imread(path, cv2.IMREAD_GRAYSCALE)            # 图像读取
+        # self.pic_origin = cv2.imread(path, cv2.IMREAD_GRAYSCALE)            # 图像读取
+        self.pic_origin, _ = get_ele_data_from_path(strname=path)              # 图像读取
         self.pic_origin_padding = FMI_padding(self.pic_origin, padding)     # 图像加padding，用来进行辅助修复
         self.len_windows = len_windows                                      # 图像遍历窗口长度设置
         self.length_target = pic_length_target                              # 输出图像边长，方形的
